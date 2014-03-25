@@ -1,0 +1,11 @@
+brain:
+    build: brain
+    volumes:
+        - brain/:/code
+    ports:
+        - "8000:8000"
+    command: python manage.py runserver 0.0.0.0:8000
+ssh:
+    build: tests/ssh
+    ports:
+        - "49100:22"
