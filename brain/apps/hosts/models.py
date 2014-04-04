@@ -4,6 +4,7 @@ from django.db import models
 class Host(models.Model):
     name = models.CharField(
         max_length=64, null=True, unique=True)
+    # Maybe this should be a GenericIPAddressField?
     host = models.CharField(
         max_length=128, null=True, unique=True, help_text='IP/Host to connect to Docker')
     port = models.SmallIntegerField(null=True, default=4243)
