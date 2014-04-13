@@ -22,11 +22,6 @@ describe 'Model', ->
         newUser = new User({name: 'Fletcher'})
         expect(newUser.name).toEqual('Fletcher')
 
-    it 'should know what type it is', ->
-        expect(@user.type()).toEqual('@User')
-        @user = angular.copy(@user)
-        expect(@user.type()).toEqual('User')
-
     it 'should output to a server format', ->
         expect(@user.toServer()).toEqual({
             'name': 'Jonathan'

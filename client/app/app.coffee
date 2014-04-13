@@ -21,12 +21,24 @@ app.config(($stateProvider, $urlRouterProvider) ->
       controller: 'hostListCtrl')
     .state('_.hosts.create'
       url: 'add/'
-      templateUrl: 'hostDetail.template'
-      controller: 'hostDetailCtrl')
+      resolve:
+        host: (Host) ->
+          return new Host({})
+      views:
+        "@_":
+          templateUrl: 'hostDetail.template'
+          controller: 'hostDetailCtrl')
     .state('_.hosts.detail'
       url: '{hostId}/'
-      templateUrl: 'hostDetail.template'
-      controller: 'hostDetailCtrl')
+      resolve:
+        host: (Host, $stateParams) ->
+          host = new Host({id: $stateParams.hostId})
+          host.fetch()
+          return host
+      views:
+        "@_":
+          templateUrl: 'hostDetail.template'
+          controller: 'hostDetailCtrl')
   $urlRouterProvider.otherwise('/')
 )
 

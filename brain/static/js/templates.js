@@ -18,7 +18,7 @@ try {
 }
 module.run(['$templateCache', function($templateCache) {
   $templateCache.put('hostDetail.template',
-    'Host Detail');
+    '<form class="form-inline"><div class="form-group block-level"><input type="text" class="form-control" ng-model="host.host" placeholder="Hostname: 127.0.0.1"></div><div class="form-group"><input type="text" class="form-control" ng-model="host.port" placeholder="Port: 8000"></div><div class="form-group"><button class="btn btn-default btn-block" ng-click="host.save()">Add Host</button></div></form>');
 }]);
 })();
 
@@ -30,6 +30,6 @@ try {
 }
 module.run(['$templateCache', function($templateCache) {
   $templateCache.put('hostList.template',
-    '<div class="list-group"><a class="list-group-item active" ng-repeat="host in host" ui-sref="_.hosts.detail({hostId:host.id})"><h4 class="list-group-item-heading">{{ host.hostname}}:{{host.port}}</h4><p class="list-group-item-text">Status Check</p></a></div><a class="list-group-item active" ng-show="!hosts.length" ui-sref="_.host.create">Add a host.</a>');
+    '<div class="list-group"><a class="list-group-item active" ng-repeat="host in hosts" ui-sref="_.hosts.detail({hostId:host.id})"><h4 class="list-group-item-heading">{{ host.host }}:{{ host.port }}</h4><p class="list-group-item-text">Status Check</p></a></div><a class="btn btn-default btn-block" ui-sref="_.hosts.create">Add a host.</a>');
 }]);
 })();

@@ -7,5 +7,10 @@ angular.module('hosts')
         @field 'port', default: null
         @field 'ssh_setup', default: false
 
+        url: ->
+            if @id
+                return "/api/v1/hosts/#{id}/"
+            else
+                return "/api/v1/hosts/"
     return Host
 )

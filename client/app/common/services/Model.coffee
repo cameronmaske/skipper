@@ -65,7 +65,7 @@ angular.module('common')
             attributes = {}
             for field in @fieldNames
                 value = @[field]
-                attributes(underScore(field)) = value
+                attributes[underScore(field)] = value
             return attributes
 
         fromServer: (attributes) ->

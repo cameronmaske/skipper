@@ -15,11 +15,12 @@
   "homepage": "https://github.com/cameronmaske/skipper",
   "dependencies": {
     "angular": "1.2.16",
-    "angular-ui-router": "0.2.10"
+    "angular-ui-router": "0.2.10",
+    "underscore": "~1.6.0"
   },
   "overrides": {
-      "angular-ui-router": {
-          "main": "release/angular-ui-router.js"
-      }
+    "angular-ui-router": {
+      "main": "release/angular-ui-router.js"
+    }
   }
 }

@@ -1,13 +1,13 @@
 <div class="list-group">
-  <a class="list-group-item active" ng-repeat="host in host" ui-sref="_.hosts.detail({hostId:host.id})">
+  <a class="list-group-item active" ng-repeat="host in hosts" ui-sref="_.hosts.detail({hostId:host.id})">
     <h4 class="list-group-item-heading">
-      {{ host.hostname}}:{{host.port}}
+      {{ host.host }}:{{ host.port }}
     </h4>
     <p class="list-group-item-text">Status Check</p>
   </a>
 </div>
 
-<a class="list-group-item active" ng-show="!hosts.length" ui-sref="_.host.create">
+<a class="btn btn-default btn-block" ui-sref="_.hosts.create">
   Add a host.
 </a>
 

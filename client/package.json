@@ -30,7 +30,7 @@
     "gulp-ngmin": "~0.1.2",
     "gulp-minify-css": "~0.2.0",
     "gulp-bower-files": "^0.2.1",
-    "karma": "^0.12.6",
+    "karma": "~0.11.0",
     "karma-phantomjs-launcher": "^0.1.4",
     "karma-jasmine": "^0.1.5",
     "karma-coffee-preprocessor": "^0.2.1"

@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from hosts.api.serializer import HostSerializer
-from hosts.model import Host
+from hosts.models import Host
 
 
 class HostList(APIView):
