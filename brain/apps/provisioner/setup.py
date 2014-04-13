@@ -12,33 +12,31 @@ def install_ssh_public_key(host, public_key, user, password):
         host.save()
 
 
-def check_docker(host):
+def check_docker(host, private_key):
     # Check if docker is installed on the host.
-    with settings(**host.env()):
+    with settings(pkey=private_key, **host.env()):
         out = run('which docker')
         if out == '':
             return False
         return True
 
 
-def install_core(host):
+def install_core(host, private_key):
     # Install some core dependencies required for Docker.
-    with settings(**host.env()):
+    with settings(pkey=private_key, **host.env()):
         run('apt-get -y update && apt-get -y upgrade')
         run('apt-get install -y curl')
 
 
-def install_docker(host):
+def install_docker(host, private_key):
     # Install docker on the host.
     # Based on https://get.docker.io/ubuntu/
-    with settings(**host.env()):
+    with settings(pkey=private_key, **host.env()):
         run('curl -sL https://get.docker.io/ | sh')
 
 
-def configure_docker(host):
-    with settings(**host.env()):
+def configure_docker(host, private_key):
+    with settings(pkey=private_key, **host.env()):
         if not files.contains('/etc/default/docker', 'DOCKER_OPTS="-H tcp://0.0.0.0:4243 -H unix://var/run/docker.sock"'):
             files.append('/etc/default/docker', 'DOCKER_OPTS="-H tcp://0.0.0.0:4243 -H unix://var/run/docker.sock"', use_sudo=True)
             sudo('service docker restart')
-
-

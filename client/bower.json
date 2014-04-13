@@ -1,0 +1,25 @@
+{
+  "name": "skipper",
+  "version": "0.0.1",
+  "description": "a docker service management tool.",
+  "moduleType": [
+    "globals"
+  ],
+  "keywords": [
+    "docker"
+  ],
+  "authors": [
+    "Cameron Maske"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/cameronmaske/skipper",
+  "dependencies": {
+    "angular": "1.2.16",
+    "angular-ui-router": "0.2.10"
+  },
+  "overrides": {
+      "angular-ui-router": {
+          "main": "release/angular-ui-router.js"
+      }
+  }
+}

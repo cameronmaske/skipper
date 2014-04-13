@@ -5,7 +5,16 @@ brain:
     ports:
         - "8000:8000"
     command: python manage.py runserver 0.0.0.0:8000
-ssh:
-    build: tests/ssh
+client:
+    build: client
+    volumes:
+        - client/:/code
+        - brain/static:/static
     ports:
-        - "49100:22"
+        - "35729:35729"
+karma:
+    build: client
+    volumes:
+        - client/:/code
+        - brain/static:/static
+    command: "karma start tests/karma.conf.coffee"

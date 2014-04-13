@@ -9,4 +9,4 @@ RUN pip install -r /code/requirements.txt
 
 WORKDIR /code/
 
-CMD echo hello
+CMD python manage.py runserver 0.0.0.0:8000

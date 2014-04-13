@@ -7,6 +7,7 @@ urlpatterns = patterns(
     url(r'^register/$', 'accounts.views.register', name='register'),
     url(r'^login/$', 'django.contrib.auth.views.login', name='login'),
     url(r'^logout/$', 'django.contrib.auth.views.logout', {'next_page':'/'}, name='logout'),
+    url(r'^!/$', 'client.views.client', name='client'),
     url(r'^api/v1/', include('api.v1', namespace='api-v1')),
     url(r'^admin/', include(admin.site.urls)),
 )
