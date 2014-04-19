@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+  <head>
+    {% block head %}{% endblock %}
+    <title>
+      {% block title %}{% endblock %}
+    </title>
+    {% load staticfiles %}
+    <link rel="stylesheet" type="text/css" href="{% static "css/main.css" %}">
+    <script src="//localdocker:35729/livereload.js"></script>
+  </head>
+  <body {% block body %}{% endblock %}>
+  {% block content %}
+  {% endblock %}
+
+  {% block javascript %}
+  {% endblock %}
+ </body>
+</html>
