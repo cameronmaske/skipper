@@ -1,7 +1,7 @@
 <div class="list-group">
   <a class="list-group-item active" ng-repeat="host in hosts" ui-sref="_.hosts.detail({hostId:host.id})">
     <h4 class="list-group-item-heading">
-      {{ host.host }}:{{ host.port }}
+      {{ host.address }}:{{ host.port }}
     </h4>
     <p class="list-group-item-text">Status Check</p>
   </a>

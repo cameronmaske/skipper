@@ -13,9 +13,13 @@ class Migration(migrations.Migration):
             fields=[
                 (u'id', models.AutoField(verbose_name=u'ID', serialize=False, auto_created=True, primary_key=True)),
                 ('name', models.CharField(max_length=64, unique=True, null=True)),
-                ('host', models.CharField(help_text='IP/Host to connect to Docker', max_length=128, unique=True, null=True)),
-                ('port', models.SmallIntegerField(default=4243, null=True)),
-                ('ssh_setup', models.NullBooleanField(default=False)),
+                ('address', models.CharField(help_text='IP of the host.', max_length=128, unique=True, null=True)),
+                ('port', models.SmallIntegerField(default=22)),
+                ('core_installed', models.BooleanField(default=False)),
+                ('docker_installed', models.BooleanField(default=False)),
+                ('docker_version', models.CharField(max_length=10, null=True)),
+                ('docker_port', models.SmallIntegerField(default=4243)),
+                ('logs', models.TextField(null=True)),
             ],
             options={
             },

@@ -248,45 +248,6 @@ angular.module('common').factory('pleaseHold', function () {
     }
   };
 });
-var __hasProp = {}.hasOwnProperty, __extends = function (child, parent) {
-    for (var key in parent) {
-      if (__hasProp.call(parent, key))
-        child[key] = parent[key];
-    }
-    function ctor() {
-      this.constructor = child;
-    }
-    ctor.prototype = parent.prototype;
-    child.prototype = new ctor();
-    child.__super__ = parent.prototype;
-    return child;
-  };
-angular.module('hosts').factory('Host', [
-  '$http',
-  'Model',
-  function ($http, Model) {
-    var Host;
-    Host = function (_super) {
-      __extends(Host, _super);
-      function Host() {
-        return Host.__super__.constructor.apply(this, arguments);
-      }
-      Host.field('id', { defaults: null });
-      Host.field('host', { 'default': null });
-      Host.field('port', { 'default': null });
-      Host.field('ssh_setup', { 'default': false });
-      Host.prototype.url = function () {
-        if (this.id) {
-          return '/api/v1/hosts/' + id + '/';
-        } else {
-          return '/api/v1/hosts/';
-        }
-      };
-      return Host;
-    }(Model);
-    return Host;
-  }
-]);
 angular.module('hosts').controller('hostDetailCtrl', [
   '$scope',
   'host',
@@ -311,5 +272,43 @@ angular.module('hosts').controller('hostListCtrl', [
       }
       return _results;
     });
+  }
+]);
+var __hasProp = {}.hasOwnProperty, __extends = function (child, parent) {
+    for (var key in parent) {
+      if (__hasProp.call(parent, key))
+        child[key] = parent[key];
+    }
+    function ctor() {
+      this.constructor = child;
+    }
+    ctor.prototype = parent.prototype;
+    child.prototype = new ctor();
+    child.__super__ = parent.prototype;
+    return child;
+  };
+angular.module('hosts').factory('Host', [
+  '$http',
+  'Model',
+  function ($http, Model) {
+    var Host;
+    Host = function (_super) {
+      __extends(Host, _super);
+      function Host() {
+        return Host.__super__.constructor.apply(this, arguments);
+      }
+      Host.field('id', { defaults: null });
+      Host.field('address', { 'default': null });
+      Host.field('port', { 'default': 22 });
+      Host.prototype.url = function () {
+        if (this.id) {
+          return '/api/v1/hosts/' + id + '/';
+        } else {
+          return '/api/v1/hosts/';
+        }
+      };
+      return Host;
+    }(Model);
+    return Host;
   }
 ]);
