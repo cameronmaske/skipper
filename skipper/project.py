@@ -1,15 +1,5 @@
-import yaml
 from services import parse_services
 from instances import parse_instances
-
-
-def load_config():
-    config = yaml.load(open('skipper.yml'))
-    return config
-
-
-def parse_config(config):
-    pass
 
 
 class Service(object):
@@ -18,7 +8,10 @@ class Service(object):
 
 
 class Project(object):
-    def __init__(self):
+    def __init__(self, name):
+        if not name:
+            raise Exception("A project must have a name.")
+        self.name = name
         self.services = []
         self.instances = []
 
@@ -29,5 +22,3 @@ class Project(object):
 
         for name, details in config['instances'].items():
             self.instances += parse_instances(name, details)
-
-

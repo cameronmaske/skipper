@@ -14,7 +14,7 @@ class BaseConfig(dict):
         self.save()
 
     def __getitem__(self, key):
-        return self._store[key]
+        return self._store.get(key)
 
     def __delitem__(self, key):
         del self._store[key]
@@ -29,10 +29,11 @@ class BaseConfig(dict):
 
 class Config(BaseConfig):
     def retrieve(self):
-        with open('skipper.json', 'a+') as f:
+        with open('skipper.json', 'r') as f:
             try:
                 return json.load(f)
-            except ValueError:
+            except ValueError as e:
+                print e
                 return {}
 
     def save(self):
@@ -42,7 +43,7 @@ class Config(BaseConfig):
 
 def get_config():
     config = Config()
-    if not config.get('ACCESS_KEY') or not config.get('SECRET_KEY'):
+    if not config['ACCESS_KEY'] or not config['SECRET_KEY']:
         click.utils.echo("""As this is your first time running skipper, we need to store your some AWS Security Credentials.
 Please visit https://console.aws.amazon.com/iam/home?#security_credential
 Under Access Keys, click Create New Access Key.""")
