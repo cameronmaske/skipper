@@ -1,2 +1,9 @@
-*db.sqlite3
-*.pyc
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.egg-info
+*~.DS_Store
+
+*skipper.json
+/dist
+NOTES.md
