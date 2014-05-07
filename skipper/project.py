@@ -8,20 +8,27 @@ class Service(object):
 
 
 class Project(object):
-    def __init__(self, name):
+    def __init__(self, name, host):
         if not name:
             raise Exception("A project must have a name.")
         self.name = name
+        self.add_host(host)
+
         self.services = []
         self.instances = []
 
-    def attach_host(self, host):
+    def add_host(self, host):
         self.host = host
+        host.project = self
 
-    def from_config(self, config):
-        self.name = config['name']
-        for name, details in config['services'].items():
+    def configure_services(self, configuration):
+        for name, details in configuration.items():
             self.services += parse_services(name, details)
 
-        for name, details in config['instances'].items():
+    def configure_instances(self, configuration):
+        for name, details in configuration.items():
             self.instances += parse_instances(name, details)
+
+    def deploy(self):
+        if not self.host._setup:
+            self.host.setup()
