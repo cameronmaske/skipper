@@ -15,6 +15,9 @@ class Project(object):
         self.services = []
         self.instances = []
 
+    def attach_host(self, host):
+        self.host = host
+
     def from_config(self, config):
         self.name = config['name']
         for name, details in config['services'].items():

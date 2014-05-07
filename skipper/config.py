@@ -4,20 +4,15 @@ import click
 
 class BaseConfig(dict):
     def __init__(self, *args, **kwargs):
-        self._store = self.retrieve()
+        super(BaseConfig, self).__init__(*args, **kwargs)
+        self.update(self.retrieve())
 
-    def __repr__(self):
-        return self._store.__repr__()
-
-    def __setitem__(self, key, value):
-        self._store[key] = value
+    def __setitem__(self, *args, **kwargs):
+        super(BaseConfig, self).__setitem__(*args, **kwargs)
         self.save()
 
-    def __getitem__(self, key):
-        return self._store.get(key)
-
-    def __delitem__(self, key):
-        del self._store[key]
+    def __delitem__(self, *args, **kwargs):
+        super(BaseConfig, self).__delitem__(*args, **kwargs)
         self.save()
 
     def retrieve(self):
@@ -32,13 +27,12 @@ class Config(BaseConfig):
         with open('skipper.json', 'r') as f:
             try:
                 return json.load(f)
-            except ValueError as e:
-                print e
+            except ValueError:
                 return {}
 
     def save(self):
         with open('skipper.json', 'w+') as f:
-            f.write(json.dumps(self._store, indent=2))
+            f.write(json.dumps(self, indent=2))
 
 
 def get_config():
