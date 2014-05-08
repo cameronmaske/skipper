@@ -5,3 +5,4 @@ docker-py
 jinja2
 fig
 PyYAML
+requests

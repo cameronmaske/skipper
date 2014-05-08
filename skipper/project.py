@@ -1,10 +1,5 @@
-from services import parse_services
+from services import parse_services, build_service
 from instances import parse_instances
-
-
-class Service(object):
-    def __init__(self, name, **kwargs):
-        self.name = name
 
 
 class Project(object):
@@ -30,5 +25,9 @@ class Project(object):
             self.instances += parse_instances(name, details)
 
     def deploy(self):
+        # Ensure the host is configured.
         if not self.host._setup:
             self.host.setup()
+        # Build the services.
+        for service in self.services:
+            build_service(service)

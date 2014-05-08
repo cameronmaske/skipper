@@ -23,9 +23,6 @@ def deploy():
     project.configure_instances(configuration=settings['instances'])
     project.deploy()
 
-    project.services[0].scale(3)
-
-
 
 
 

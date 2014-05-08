@@ -1,3 +1,6 @@
+import re
+
+
 def get_subset(a, keys):
     return dict((k, a[k]) for k in keys if k in a)
 
@@ -16,3 +19,16 @@ def find(array, properties):
 
 def contains_keys(a, b):
     return set(a.keys()).issubset(b.keys())
+
+
+def get_index(x, index):
+    """
+    Get the element at the index of the list or return None
+    >>> example = [1, 2]
+    >>> get_index(example, 1)
+    1
+    >>> get_index(example, 7)
+    None
+    """
+    if len(x) > index:
+        return x[index]
