@@ -39,27 +39,23 @@ class Host(object):
         # If we don't have a private key stored, should go ahead and generate
         # a new one. If one already exists, raise an error.
         project_name = "skipper_%s" % self.project.name
-
-        if not self.config['PRIVATE_KEY']:
+        if not self.config.get('PRIVATE_KEY'):
             # TODO: Abstract to get_or_create_key() + test
             try:
                 key = self.conn.get_all_key_pairs(keynames=[project_name])[0]
+                if not key.material:
+                    click.utils.echo("""An EC2 Key pair already exists for this project.\nPlease add the private key to .skippercfg""")
+                    raise Exception()
             except exception.EC2ResponseError as e:
                 if e.code == 'InvalidKeyPair.NotFound':
                     click.utils.echo("""No existing EC2 Key Pair can be found for %s.
                         A new one will be generated and stored in .skippercfg""" % self.project.name)
                     key = self.conn.create_key_pair(project_name)
-                else:
-                    raise e
 
-                if not key.material:
-                    click.utils.echo("""
-                        An EC2 Key pair already exists for this project.
-                        Please add the private key to .skippercfg""")
-                else:
                     click.utils.echo("Succesfully generated a new EC2 Key Pair.")
                     self.config['PRIVATE_KEY'] = key.material
-
+                else:
+                    raise e
         # Need to ensure we have a secrurity group setup with SSH access.
         # Retrive the group or create it.
         # TODO: Abstract to get_or_create_group() + test
