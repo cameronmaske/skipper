@@ -1,27 +1,8 @@
-from boto import ec2, exception
-from time import sleep
+from ec2 import EC2, authorize_group
+from instances import (
+    Instance, parse_instances, instances_to_create, instances_to_remove)
 import click
-
-
-def authorize_group(group, ip_protocol, from_port, to_port, cidr_ip, retries=5):
-    """
-    Checks if a group has the correct protocol already authorized, else
-    attempts to authorize them.
-
-    Usage:
-    >>> authorize_group(group, 'tcp', 22, 22, '0.0.0.0/0')
-    """
-    # TODO: Look at the rules already in a group. Saves an API call.
-    # Tries 5 times by default. Fail safe if boto's API is down.
-    for i in range(retries):
-        try:
-            group.authorize(ip_protocol, from_port, to_port, cidr_ip)
-            break
-        except exception.EC2ResponseError as e:
-            if e.code == 'InvalidPermission.Duplicate':
-                break
-            # Wait one second before retrying.
-            sleep(1)
+from skipper.exceptions import ConfigurationException
 
 
 class Host(object):
@@ -32,43 +13,88 @@ class Host(object):
 
     def add_config(self, config):
         self.config = config
-        self.conn = ec2.connection.EC2Connection(
-            config['ACCESS_KEY'], config['SECRET_KEY'])
+        self.ec2 = EC2(config['ACCESS_KEY'], config['SECRET_KEY'])
+
+    @property
+    def project_name(self):
+        return "skipper_%s" % self.project.name
 
     def setup(self):
         # If we don't have a private key stored, should go ahead and generate
         # a new one. If one already exists, raise an error.
-        project_name = "skipper_%s" % self.project.name
         if not self.config.get('PRIVATE_KEY'):
-            # TODO: Abstract to get_or_create_key() + test
-            try:
-                key = self.conn.get_all_key_pairs(keynames=[project_name])[0]
-                if not key.material:
-                    click.utils.echo("""An EC2 Key pair already exists for this project.\nPlease add the private key to .skippercfg""")
-                    raise Exception()
-            except exception.EC2ResponseError as e:
-                if e.code == 'InvalidKeyPair.NotFound':
-                    click.utils.echo("""No existing EC2 Key Pair can be found for %s.
-                        A new one will be generated and stored in .skippercfg""" % self.project.name)
-                    key = self.conn.create_key_pair(project_name)
+            key, created = self.ec2.get_or_create_key(self.project_name)
+            if created:
+                click.utils.echo("""No existing EC2 Key Pair can be found for %s.\nA new has been generated and stored in .skippercfg""" % self.project.name)
+            if not created and not key.material:
+                click.utils.echo("""An EC2 Key pair already exists for this project.\nPlease add the private key to .skippercfg""")
+                raise ConfigurationException()
+            if key.material:
+                self.config['PRIVATE_KEY'] = key.material
 
-                    click.utils.echo("Succesfully generated a new EC2 Key Pair.")
-                    self.config['PRIVATE_KEY'] = key.material
-                else:
-                    raise e
         # Need to ensure we have a secrurity group setup with SSH access.
         # Retrive the group or create it.
-        # TODO: Abstract to get_or_create_group() + test
-        try:
-            group = self.conn.get_all_security_groups(
-                filters={'group-name': project_name})[0]
-        except IndexError:
-            group = self.conn.create_security_group(
-                project_name, "Skipper security group for %s" % self.project.name)
-
+        group = self.ec2.get_or_create_group(self.project_name)
         authorize_group(group, 'tcp', 22, 22, '0.0.0.0/0')
-
         self._setup = False
+
+    def configure_instances(self, configuration):
+        # TODO: Rename this. Terrible variable naming.
+        instances = parse_instances(configuration)
+        all_instances = []
+        for each in instances:
+            all_instances.append(Instance(each))
+        # TODO: Should this be stored here instead?
+        self.instances = all_instances
+        return all_instances
+
+    def deploy_instances(self):
+        existing_instances = self.ec2.filter_instances(
+            {'tag:project': self.project_name, 'tag:skipper': 'aye-aye'})
+
+        # skipper instances to create.
+        to_create = instances_to_create(self.instances, existing_instances)
+        # ec2 instances that are no longer needed.
+        to_remove = instances_to_remove(self.instances, existing_instances)
+
+        for instance in to_create:
+            created = self.ec2.create_instance(**instance.to_aws())
+            created.add_tag('project', self.project_name)
+            created.add_tag('uuid', instance.uuid)
+            created.add_tag('skipper', 'aye-aye')
+
+        for instance in to_remove:
+            self.ec2.remove_instance(instance)
+
+    def create_instance(self, instance):
+        reservation = self.conn.run_instances(**{
+            'image_id': 'ami-a73264ce',  # Ubuntu 12.04.1
+            'instance_type': 't1.micro',
+            'security_groups': ['skipper'],
+            'key_name': 'skipper'
+        })
+        ec2_instance = reservation.instances[0]
+
+        while ec2_instance.state != 'running':
+            sleep(2)
+            ec2_instance.update()
+            print "Instance state: " + instance.state
+
+        if ec2_instance.state == 'running':
+            print('Instance is now running.')
+            ec2_instance.add_tag('type', 'skipper')
+
+        print("Waiting 15 seconds for good measure.")
+        sleep(15)
+
+        return ec2_instance
+
+    def clean_up(self, instances):
+        # TODO: Remove any instances that no longer exists.
+        existing = self.conn.get_only_instances(filters={
+            'tag:project': self.project_name,
+            'tag:skipper': 'skipper'
+        })
 
 
 host = Host()

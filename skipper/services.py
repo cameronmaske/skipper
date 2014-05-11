@@ -1,4 +1,9 @@
 from __future__ import unicode_literals
+import json
+import os
+import docker
+import requests
+import re
 
 
 def parse_services(name, details):
@@ -16,16 +21,8 @@ class Service(object):
         self.registry = kwargs.get('registry')
 
 
-import os
-import docker
-import requests
-import re
-import sys
-from fig.service import stream_output
-
-
 def highest_tag_version(tags):
-    # Deteremine the next tag based on exisitng tags.
+    # Deteremine the next tag based on existing tags.
     highest_version = 0
     for version in tags.keys():
         try:
@@ -69,6 +66,34 @@ def generate_tag(version):
     return "v%s" % version
 
 
+def print_output(stream):
+    events = []
+    for line in stream:
+        line = json.loads(line)
+        if line.get('stream'):
+            print(line['stream'])
+            events.append(line['stream'])
+    return events
+
+
+def get_image_id_from_events(all_events):
+    # Taken from Fig.
+    # https://github.com/orchardup/fig/blob/master/fig/service.py
+    image_id = None
+    for event in all_events:
+        match = re.search(r'Successfully built ([0-9a-f]+)', event)
+        if match:
+            image_id = match.group(1)
+    return image_id
+
+
+def image_in_tags(image_id, tags):
+    for name, image in tags.items():
+        if image_id[0:12] == image[0:12]:
+            return name
+    return None
+
+
 def build_service(service):
     c = docker.Client(os.environ.get('DOCKER_HOST'))
     try:
@@ -81,28 +106,29 @@ def build_service(service):
         print("No existing builds can be found for the %s service." % (service.name))
 
     print("Building %s" % (service.name))
-    # Taken from Fig.
-    build_output = c.build(service.path, tag=service.registry['name'], rm=True, stream=True)
-    all_events = stream_output(build_output, sys.stdout)
 
-    image_id = None
-    for event in all_events:
-        if 'stream' in event:
-            match = re.search(r'Successfully built ([0-9a-f]+)', event.get('stream', ''))
-            if match:
-                image_id = match.group(1)
-
+    # Since we want to log out the the build process, we'll need to get the image
+    # id created from the logs afterwards.
+    stream = c.build(service.path, tag=service.registry['name'], rm=True, stream=True)
+    all_events = print_output(stream)
+    image_id = get_image_id_from_events(all_events)
     print("Successfully built %s" % (service.name))
 
-    for name, image in existing_tags.items():
-        if image_id == image[0: 12]:
-            print("This build already exists as %s:%s." % (name, image))
-            print("Aborting...")
-            raise Exception("Already uploaded.")
+    exists = image_in_tags(image_id, existing_tags)
+
+    if exists:
+        print("This build already exists, as %s:%s" % (service.registry['name'], exists))
+        print("Aborting...")
+        raise Exception("Already uploaded.")
 
     tag = generate_tag(next_version)
     print("Pushing %s:%s to %s:%s..." % (service.name, tag, service.registry['name'], tag))
     c.tag(image_id, repository=service.registry['name'], tag=tag)
     c.push(service.registry['name'])
     print("Successfully pushed %s:%s" % (service.name, tag))
+
+    service.container = {
+        'repo': service.registry['name'],
+        'tag': tag
+    }
 
