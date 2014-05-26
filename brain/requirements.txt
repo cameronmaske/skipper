@@ -1,3 +1,0 @@
-fabric
-git+git://github.com/django/django.git@1.7b1
-djangorestframework

@@ -1,0 +1,17 @@
+name: demo
+groups:
+    demo:
+        size: medium
+        loadbalance:
+            - "80:80"
+        instances: 1
+        services:
+            web:
+                build: .
+                loadbalance:
+                    - "80:8000"
+                    - redis
+            redis:
+                image: dockerfiles/redis
+                loadbalance:
+                    - "1234:1234"
