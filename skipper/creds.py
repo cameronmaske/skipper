@@ -1,8 +1,5 @@
 import json
-import click
-
-from utils import contains_keys
-
+import os
 
 class NestedDict(dict):
     """
@@ -41,14 +38,23 @@ class Creds(NestedDict):
         super(Creds, self).__delitem__(*args, **kwargs)
         self.storage.save(self)
 
+    def save(self):
+        self.storage.save(self)
+
 
 class JSONStorage(object):
     """
-    Stores a config in a json format in a .skippercfg file.
+    Stores a creds in a json format in a .skippercfg file.
     """
+    def __init__(self, path=None):
+        if path:
+            self.path = path
+        else:
+            self.path = os.getcwd()
+
     def retrieve(self):
         try:
-            with open('.skippercfg', 'r') as f:
+            with open('%s/.skippercfg' % self.path, 'r') as f:
                 try:
                     return json.load(f)
                 except ValueError:
@@ -56,17 +62,9 @@ class JSONStorage(object):
         except IOError:
             return {}
 
-    def save(self, config):
-        with open('.skippercfg', 'w+') as f:
-            f.write(json.dumps(config, indent=2))
+    def save(self, creds):
+        with open('%s/.skippercfg' % self.path, 'w+') as f:
+            f.write(json.dumps(creds, indent=2))
 
 
 creds = Creds(storage=JSONStorage())
-
-
-def get_creds(requirements):
-    if not contains_keys(requirements['keys'], creds):
-        click.utils.echo(requirements['message'])
-        for key, message in requirements['keys'].items():
-            creds[key] = click.prompt(message)
-    return creds

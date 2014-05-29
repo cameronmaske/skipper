@@ -13,7 +13,7 @@ Let's run through an example deployment of a simple flask app.
 skipper.yml
 ```
 name: demo
-instances:
+groups:
     web:
         size: m1.small
         loadbalance:
@@ -29,7 +29,7 @@ services:
             - "80:5000"
         scale: 2
         test: "python manage.py tests"
-        registry:
+        repo:
             name: cameronmaske/flask-web
 ```
 
