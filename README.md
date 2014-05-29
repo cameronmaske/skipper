@@ -1,4 +1,6 @@
 # Skipper
+[![Build Status](https://travis-ci.org/cameronmaske/skipper.svg?branch=master)](https://travis-ci.org/cameronmaske/skipper)
+[![Coverage Status](https://coveralls.io/repos/cameronmaske/skipper/badge.png)](https://coveralls.io/r/cameronmaske/skipper)
 
 Skipper is a docker orchestration tool.
 
