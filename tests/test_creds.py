@@ -1,7 +1,7 @@
 import pytest
 import mock
 
-from skipper.creds import Creds
+from skipper.creds import Creds, JSONStorage
 
 
 @pytest.fixture()
@@ -54,3 +54,22 @@ def test_config_retrieve():
     creds = Creds(storage=storage)
     assert creds == existing
     assert storage.retrieve.called
+
+
+def test_storage_retrieve(tmpdir):
+    storage = JSONStorage(path=tmpdir)
+    tmpdir.join('.skippercfg').write('{"foo": "bar"}')
+    assert storage.retrieve() == {'foo': 'bar'}
+
+
+def test_storage_retrieve_invalid_json(tmpdir):
+    storage = JSONStorage(path=tmpdir)
+    tmpdir.join('.skippercfg').write('["boo"}')
+    assert storage.retrieve() == {}
+
+
+def test_storage_save(tmpdir):
+    storage = JSONStorage(path=tmpdir)
+    storage.save({'foo': 'bar'})
+    skippercfg = tmpdir.join('.skippercfg').read()
+    assert skippercfg == '{\n  "foo": "bar"\n}'

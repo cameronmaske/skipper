@@ -1,17 +1,17 @@
 name: demo
+services:
+    web:
+        build: .
+        repo:
+            name: cameronmaske/flask-web
 groups:
-    demo:
-        size: medium
+    web:
+        size: t1.m
         loadbalance:
             - "80:80"
-        instances: 1
+        scale: 2
+        regions:
+            - us-east-1
+            - us-west-1
         services:
-            web:
-                build: .
-                loadbalance:
-                    - "80:8000"
-                    - redis
-            redis:
-                image: dockerfiles/redis
-                loadbalance:
-                    - "1234:1234"
+            - web

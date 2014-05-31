@@ -1,4 +1,4 @@
-from skipper.utils import find, get_subset, contains_keys
+from skipper.utils import get_subset, find, contains_keys, get_index
 
 
 def test_get_subset():
@@ -22,5 +22,11 @@ def test_contains_keys():
     foo = {'b': 1}
     bar = {'b': 2, 'a': 1}
     boo = {'c': 1}
-    assert contains_keys(foo, bar) == True
-    assert contains_keys(foo, boo) == False
+    assert contains_keys(foo, bar) is True
+    assert contains_keys(foo, boo) is False
+
+
+def test_get_index():
+    example = [1, 2]
+    assert get_index(example, 0) == 1
+    assert get_index(example, 3) is None
