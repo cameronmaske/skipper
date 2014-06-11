@@ -1,4 +1,3 @@
-from skipper.exceptions import ConfigurationException
 from regions import REGIONS
 from sizes import INSTANCE_SIZES
 
@@ -10,8 +9,15 @@ from fabric.contrib.files import contains, append
 
 
 class Instance(object):
-    def __init__(self, name, scale=1, size="t1.micro", region="us-east-1", loadbalance=None):
+    def __repr__(self):
+        return '(AWSInstance: %s - %s)' % (self.name, self.project_name)
+
+    def __init__(
+            self, name, project_name, ec2,
+            scale=1, size="t1.micro", region="us-east-1", loadbalance=None):
         self.name = name
+        self.project_name = project_name
+        self.ec2 = ec2
         self.scale = scale
         self.valid_size(size)
         self.valid_region(region)
@@ -19,20 +25,20 @@ class Instance(object):
 
     @property
     def uuid(self):
-        # web_1_us-east-1
-        return "%s_%s_%s" % (self.name, self.scale, self.region)
+        # Example: web_1
+        return "%s_%s" % (self.name, self.scale)
 
     def valid_size(self, size):
         if size in INSTANCE_SIZES.keys():
             self.size = size
         else:
-            raise ConfigurationException("%s is not a valid size" % self.size)
+            raise TypeError("%s is not a valid size" % self.size)
 
     def valid_region(self, region):
         if region in REGIONS.keys():
             self.region = region
         else:
-            raise ConfigurationException("%s is not a valid region" % self.region)
+            raise TypeError("%s is not a valid region" % self.region)
 
     def to_aws(self, project_name):
         image_id = REGIONS[self.region]['ami']

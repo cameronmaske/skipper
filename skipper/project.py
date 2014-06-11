@@ -9,14 +9,15 @@ class Project(object):
 
     def __init__(self, name, host):
         self.name = name
-        self.host = host
+        host.project = self
         self.services = []
+        self.groups = []
 
     def __repr__(self):
         return "Project (%s)" % self.name
 
-    def make_service(self, *args, **kwargs):
-        service = Service(*args, **kwargs)
+    def make_service(self, name, **kwargs):
+        service = Service(name=name, **kwargs)
         return service
 
     def get_service(self, name):

@@ -6,7 +6,7 @@ services:
             name: cameronmaske/flask-web
 groups:
     web:
-        size: t1.m
+        size: t1.micro
         loadbalance:
             - "80:80"
         scale: 2

@@ -10,7 +10,6 @@ from builder import RepoNoPermission
 
 
 class CLIProject(Project):
-    exception = ClickException
 
     def __init__(self):
         try:
@@ -31,16 +30,13 @@ class CLIProject(Project):
             except TypeError as e:
                 raise ClickException("%s: %s" % (name, e.message))
 
-        self.host = get_host(self.conf.get('host', 'aws'))
-        self.host.creds = creds
 
-
-pass_config = click.make_pass_decorator(CLIProject, ensure=True)
+pass_project = click.make_pass_decorator(CLIProject, ensure=True)
 
 
 @click.group()
 @click.option('--silent', is_flag=True)
-@pass_config
+@pass_project
 def cli(project, silent):
     """
     Doc string describing the CLI at a glance.
@@ -50,7 +46,7 @@ def cli(project, silent):
 
 @cli.command()
 @click.argument('services', nargs=-1, required=False)
-@pass_config
+@pass_project
 def build(project, services):
     """
     Build and upload service(s).
@@ -61,3 +57,41 @@ def build(project, services):
             service.push()
     except (RepoNoPermission, NoSuchService) as e:
         raise ClickException(e.message)
+
+
+@cli.command()
+@click.argument('groups', nargs=-1, required=False)
+@pass_project
+def deploy(project, groups):
+    """
+    Configure and deploy group(s).
+    """
+    host = get_host(project.conf.get('host', 'aws'))
+    host.creds = creds
+    host.project = project
+    for name, details in project.conf['groups'].items():
+
+        services_names = details.pop('services', [])
+        services = project.filter_services(services_names)
+
+        instances = host.make_instances(name=name, **details)
+        for instance in instances:
+            try:
+                instance.fetch()
+            except:
+                instance.deploy()
+
+
+        # group = host.make_group(name=name)
+        # group.attach_instances(instances)
+        # group.build()
+
+@cli.command()
+@pass_project
+def test(project):
+    host = get_host(project.conf.get('host', 'aws'))
+    host.creds = creds
+    host.project = project
+
+    instance = host.make_instance(name="web", project_name="demo")
+    print instance
