@@ -1,4 +1,5 @@
-from skipper.utils import get_subset, find, contains_keys, get_index
+from skipper.utils import (
+    get_subset, find, contains_keys, get_index, extract_version)
 
 
 def test_get_subset():
@@ -30,3 +31,8 @@ def test_get_index():
     example = [1, 2]
     assert get_index(example, 0) == 1
     assert get_index(example, 3) is None
+
+
+def test_extract_version():
+    version = extract_version("Docker version 0.11.1, build fb99f99")
+    assert version == "0.11.1"

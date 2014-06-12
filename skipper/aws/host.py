@@ -1,7 +1,8 @@
 from skipper.hosts import BaseHost
-from instances import Instance
-from ec2 import EC2
+from instances import Instance, InstanceNotFound
+from ec2 import EC2, authorize_group
 from groups import AWSGroup
+from skipper.logger import log
 
 
 class Host(BaseHost):
@@ -22,6 +23,38 @@ class Host(BaseHost):
         self.creds = creds
         self.host = project
         self._ec2 = None
+        self._keys = {}
+
+    def check_keys(self, regions):
+        """
+        Checks if we have expected SSH keys required for the project.
+        """
+        for region in regions:
+            field = self.requirements['field']
+            if not self.creds[field].get(region):
+                key, created = self.ec2().get_or_create_key(
+                    region=region,
+                    name=self.project.name
+                )
+                if created:
+                    log.info(
+                        "No existing EC2 Key Pair can be found for %s on %s.\n"
+                        "A new has been generated and stored in .skippercfg"
+                        % (self.project.name, region))
+                if not created and not key.material:
+                    log.error(
+                        "An EC2 Key pair already exists for this project on %s.\n"
+                        "Please add the private key to .skippercfg"
+                        % region)
+                    raise Exception
+                if key.material:
+                    self.creds[field][region] = key.material
+                    self.creds.save()
+
+            self.add_key(region, self.creds[field][region])
+
+    def add_key(self, region, key):
+        self._keys[region] = key
 
     def ec2(self):
         if not self._ec2:
@@ -43,6 +76,63 @@ class Host(BaseHost):
 
             instances.append(instance)
         return instances
+
+    def get_instance(self, uuid, project_name, **kwargs):
+        size = kwargs.get('size', "t1.micro")
+        region = kwargs.get('region', "us-east-1")
+
+        aws_instances = self.ec2().filter_instances(
+            region=region,
+            filters={
+                'tag:uuid': uuid,
+                'tag:project': project_name
+            })
+
+        try:
+            aws_instance = aws_instances[0]
+            instance = Instance(
+                uuid=uuid,
+                project_name=project_name,
+                ec2=self.ec2,
+                aws_instance=aws_instance,
+                private_key=self._keys[region],
+                size=size,
+                region=region,
+            )
+            return instance
+        except IndexError:
+            raise InstanceNotFound()
+
+    def create_instance(self, uuid, project_name, **kwargs):
+        size = kwargs.get('size', "t1.micro")
+        region = kwargs.get('region', "us-east-1")
+
+        group = self.ec2().get_or_create_group(
+            region=region,
+            name=project_name)[0]
+
+        authorize_group(group, 'tcp', 22, 22, '0.0.0.0/0')
+
+        aws_instance = self.ec2().create_instance(
+            region=region,
+            instance_type=size,
+            key_name=project_name,
+            security_groups=[project_name]
+        )
+
+        aws_instance.add_tag('uuid', uuid)
+        aws_instance.add_tag('project', project_name)
+
+        instance = Instance(
+            uuid=uuid,
+            project_name=project_name,
+            ec2=self.ec2,
+            aws_instance=aws_instance,
+            private_key=self._keys[region],
+            size=size,
+            region=region,
+        )
+        return instance
 
     def make_instance(self, name, project_name, **kwargs):
         return Instance(

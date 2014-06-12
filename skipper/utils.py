@@ -32,3 +32,16 @@ def get_index(x, index):
     """
     if len(x) > index:
         return x[index]
+
+
+def extract_version(event):
+    """
+    Parses the output from docker --version for the version, e.g.
+
+    >>> extract_version("Docker version 0.11.1, build fb99f99")
+    "0.11.1"
+    """
+    match = re.search(r'Docker version ([0-9\.]+),', event)
+    if match:
+        version = match.group(1)
+    return version

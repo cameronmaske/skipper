@@ -39,6 +39,13 @@ REGIONS = {
 }
 
 
+def valid_region(region):
+    if region in REGIONS.keys():
+        return region
+    else:
+        raise TypeError("%s is not a valid region" % region)
+
+
 def all_regions(instances):
     regions = []
     for instance in instances:

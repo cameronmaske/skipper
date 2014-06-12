@@ -1,5 +1,8 @@
 from boto import ec2, exception
 from time import sleep
+from regions import REGIONS
+
+from skipper.logger import log
 
 
 class EC2(object):
@@ -43,6 +46,7 @@ class EC2(object):
             key = keys[0]
         except IndexError:
             key = self.call(region).create_key_pair(name)
+            created = True
         return key, created
 
     def get_or_create_group(self, name, description=None, region='us-east-1'):
@@ -76,14 +80,17 @@ class EC2(object):
         return instances
 
     def create_instance(self, region='us-east-1', **kwargs):
-        reservation = self.call(region).run_instances(**kwargs)
+        ami_image = REGIONS[region]['ami']
+        reservation = self.call(region).run_instances(ami_image, **kwargs)
         instance = reservation.instances[0]
 
+        log.info("Creating new instance")
+
         while instance.state != 'running':
-            sleep(2)
+            sleep(1)
             instance.update()
 
-        print("Instance running. Waiting 5 seconds.")
+        log.info("Successfully created instance")
         sleep(5)
 
         return instance

@@ -92,6 +92,28 @@ def test(project):
     host = get_host(project.conf.get('host', 'aws'))
     host.creds = creds
     host.project = project
+    host.check_requirements()
 
-    instance = host.make_instance(name="web", project_name="demo")
-    print instance
+    all_regions = ["us-east-1", "us-west-1"]
+    host.check_keys(regions=all_regions)
+
+    from skipper.aws.instances import InstanceNotFound
+
+    try:
+        instance = host.get_instance(
+            uuid="web_1", project_name="demo"
+        )
+        instance.update()
+    except InstanceNotFound:
+        instance = host.create_instance(
+            uuid="web_1", project_name="demo"
+        )
+
+    instance.ensure_docker_installed()
+
+    # instance = host.make_instance(name="web", project_name="demo")
+    # print instance
+    # try:
+    #     instance.fetch()
+    # except:
+    #     instance.create()
