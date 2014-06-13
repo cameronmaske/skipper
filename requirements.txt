@@ -1,8 +1,7 @@
-click
-boto
+click==2.0
+boto==2.27.0
 fabric
 docker-py==0.3.1
-jinja2
-fig
+Jinja2==2.7.2
 PyYAML==3.10
-requests
+requests==2.2.1

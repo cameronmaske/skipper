@@ -63,18 +63,27 @@ class Host(BaseHost):
                 secret_key=self.creds['AWS']['SECRET_KEY'])
         return self._ec2
 
-    def make_instances(self, name, **kwargs):
+    def get_or_create_instances(self, name, **kwargs):
         instances = []
         scale = kwargs.pop('scale', 1)
+        regions = kwargs.pop('regions', ["us-east-1"])
         for i in range(1, scale + 1):
-            instance = self.make_instance(
-                name=name,
-                project_name=self.project.name,
-                scale=i,
-                **kwargs
-            )
-
-            instances.append(instance)
+            for region in regions:
+                uuid = "%s_%s" % (name, scale)
+                try:
+                    instance = self.get_instance(
+                        uuid=uuid,
+                        project_name=self.project.name,
+                        region=region,
+                    )
+                    instance.update()
+                except InstanceNotFound:
+                    instance = self.create_instance(
+                        uuid=uuid,
+                        project_name=self.project.name,
+                        region=region,
+                    )
+                instances.append(instance)
         return instances
 
     def get_instance(self, uuid, project_name, **kwargs):

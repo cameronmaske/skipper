@@ -70,17 +70,16 @@ def deploy(project, groups):
     host.creds = creds
     host.project = project
     for name, details in project.conf['groups'].items():
-
+        host.check_keys(regions=details.get('regions', ["us-east-1"]))
         services_names = details.pop('services', [])
         services = project.filter_services(services_names)
-
-        instances = host.make_instances(name=name, **details)
+        instances = host.get_or_create_instances(name=name, **details)
         for instance in instances:
-            try:
-                instance.fetch()
-            except:
-                instance.deploy()
+            instance.ensure_docker_installed()
+            instance.docker_test()
 
+        print instances
+        print services
 
         # group = host.make_group(name=name)
         # group.attach_instances(instances)

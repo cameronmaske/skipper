@@ -17,7 +17,7 @@ class InstanceNotFound(Exception):
 
 class Instance(object):
     def __repr__(self):
-        return '(AWSInstance: %s - %s)' % (self.name, self.project_name)
+        return '(AWSInstance: %s [%s])' % (self.uuid, self.region)
 
     def __init__(
             self, uuid, project_name, ec2, aws_instance, private_key,
@@ -80,17 +80,26 @@ class Instance(object):
     def ensure_docker_installed(self):
         docker_version = "1.0.0"
         with settings(**self.fabric_params):
-            installed = run('docker --version', warn_only=True)
-            if not installed:
+            install_requirements = False
+            install_docker = False
+            docker_installed = run('which docker', warn_only=True)
+            if docker_installed:
+                docker_installed_version = extract_version(
+                    run('docker --version', warn_only=True))
+                if docker_installed_version != docker_version:
+                    install_docker = True
+            else:
+                install_requirements = True
+                install_docker = True
+
+            if install_requirements:
                 log.info("Attempting to install Docker (%s)" % docker_version)
                 sudo('sh -c "wget -qO- https://get.docker.io/gpg | apt-key add -"')
                 sudo('sh -c "echo deb http://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list"')
                 sudo('apt-get update')
                 sudo('apt-get -y install linux-image-extra-virtual')
-            else:
-                version = extract_version(installed)
 
-            if not installed or version != docker_version:
+            if install_docker:
                 sudo(
                     "apt-get update -qq; apt-get install -y -o Dpkg::Options::="
                     "'--force-confdef' -o Dpkg::Options::='--force-confold'"
@@ -101,9 +110,14 @@ class Instance(object):
                 append('/etc/default/docker', 'DOCKER_OPTS="-H tcp://0.0.0.0:5555 -H unix://var/run/docker.sock"', use_sudo=True)
                 sudo('service docker restart')
 
-    def docker_client(self):
+    def docker_test(self):
+        # https://github.com/paramiko/paramiko/blob/master/demos/forward.py
         with settings(**self.fabric_params):
-            with local_tunnel(5555, bind_port=59432):
-                client = docker.Client(base_url="http://localhost:59432")
-                return client
+            with local_tunnel(5555, bind_port=59433):
+                client = docker.Client(base_url="http://localhost:59433")
+                print "containers"
+                print client.containers()
+                print "images"
+                print client.images()
+        print 'bla'
 
