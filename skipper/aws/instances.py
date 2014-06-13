@@ -112,12 +112,30 @@ class Instance(object):
 
     def docker_test(self):
         # https://github.com/paramiko/paramiko/blob/master/demos/forward.py
-        with settings(**self.fabric_params):
-            with local_tunnel(5555, bind_port=59433):
-                client = docker.Client(base_url="http://localhost:59433")
-                print "containers"
-                print client.containers()
-                print "images"
-                print client.images()
-        print 'bla'
+        from sshtunnel import SSHTunnelForwarder
+        from paramiko import RSAKey
+        from StringIO import StringIO
+
+        private_key_file = StringIO(self.private_key)
+        private_key = RSAKey(file_obj=private_key_file)
+
+        server = SSHTunnelForwarder(
+            ssh_address=(self.aws_instance.public_dns_name, 22),
+            ssh_username="ubuntu",
+            ssh_private_key=private_key,
+            remote_bind_address=('127.0.0.1', 5555)
+        )
+        server.start()
+
+        print server.local_bind_port
+
+        client = docker.Client(
+            base_url="http://localhost:%s" % server.local_bind_port)
+        print "containers"
+        print client.containers()
+        print "images"
+        print client.images()
+        print "stop"
+        server.stop()
+        print "stopped"
 
