@@ -82,51 +82,98 @@ def deploy(project, groups):
         instances = host.get_or_create_instances(name=name, **details)
         for instance in instances:
             instance.ensure_docker_installed()
-            instance.ensure_supervisor_installed()
-            programs = [
-                {
-                    'name': 'test',
-                    'command': 'sleep 10',
-                }
-            ]
-            instance.update_supervisor(programs)
-            instance.ps()
-
-        break
+            instance.ensure_nginx_installed()
 
         with docker_tunnel(instance) as port:
             c = docker.Client(
                 base_url="http://localhost:%s" % port)
 
-            # Move this else where.
-            containers = service.containers(client=c, stopped=True)
+            all_containers = []
+            service.client = c
+            for a in service.containers():
+                print a.dictionary
 
             for service in services:
-                for i in range(1, service.scale + 1):
-                    uuid = "%s_%s_%s" % (service.name, service.repo.tag, i)
+                containers = service.run_containers()
+                print containers
+                all_containers += containers
 
-                    # GET.
-                    match = None
-                    for container in containers:
-                        if uuid == container.name:
-                            match = container
+            # instance.stop_old_containers(all_containers, client=c)
 
-                    if match:
-                        print "Already running"
-                        print match
-                        if match.is_running:
-                            match.stop()
+            # for service in services:
+            #     service.remove_old_containers(client=c)
 
-                        match.remove()
-                    else:
-                        from containers import Container
-                        # CREATE
-                        stream = c.pull(service.repo.image, stream=True)
-                        capture_events(stream)
-                        # Container.create()
-                        # Pass service params here.
-                        con = Container.create(c, image=service.repo.image, name=uuid)
-                        print con
+            # instance.update_loadbalance(services=services)
+
+            # containers = service.containers(client=c, stopped=True)
+
+            #     for i in range(1, service.scale + 1):
+            #         uuid = "%s_%s_%s" % (service.name, service.repo.tag, i)
+
+            #         # GET.
+            #         match = None
+            #         for container in containers:
+            #             if uuid == container.name:
+            #                 match = container
+
+            #         if match:
+            #             print "Already running"
+            #             print match
+            #             print match.human_readable_ports
+            #             print match.dictionary['State']
+            #             print match.ports
+
+            #             if match.is_running:
+            #                 print "stopping"
+            #                 match.stop()
+
+            #             match.remove()
+            #         else:
+            #             from containers import Container
+            #             # CREATE
+            #             stream = c.pull(service.repo.image, stream=True)
+            #             capture_events(stream)
+            #             # Container.create()
+            #             # Pass service params here.
+            #             con = Container.create(c,
+            #                 image=service.repo.image, name=uuid, ports=[5000])
+            #             print con
+            #             con.start(port_bindings={5000: None})
+            #             print con.ports
+            #             print con.human_readable_ports
+            #             print con.dictionary['State']
+
+            # programs = [
+            #     {
+            #         'name': 'web',
+            #         'command': 'docker run -p 5000:5000 cameronmaske/flask-web:v18'
+            #     }
+            # ]
+            # instance.update_supervisor(programs)
+            # container, loadbalance = service.generate_nginx()
+
+            # containers = [
+            #     {
+            #         'name': 'web',
+            #         'ports': [con.ports[5000]]
+            #     }
+            # ]
+
+            # loadbalance = [
+            #     {
+            #         'port': 90,
+            #         'container': 'web'
+            #     }
+            # ]
+
+            # instance.update_nginx(containers, loadbalance)
+
+            # # Move this else where.
+            # containers = service.containers(client=c, stopped=True)
+            # print containers
+            # instance.ps()
+
+
 
                 #     try:
 

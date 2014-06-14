@@ -86,7 +86,7 @@ class EC2(object):
             sleep(1)
             instance.update()
 
-        sleep(10)
+        sleep(30)
 
         return instance
 

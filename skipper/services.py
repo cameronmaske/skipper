@@ -36,6 +36,8 @@ class Service(object):
                 port = parse_port(port)
             self.loadbalance.update(port)
 
+        self.client = None
+
     @property
     def repo(self):
         return self._repo
@@ -103,14 +105,56 @@ class Service(object):
             self.repo.tag = tag
             log.info("Successfully pushed %s:%s" % (self.name, tag))
 
-    def containers(self, client, stopped=False, one_off=False):
+    def containers(self, stopped=False, one_off=False):
         l = []
-        for container in client.containers(all=stopped):
-            name = get_container_name(container)
-            if not name:
+        for container in self.client.containers(all=stopped):
+            uuid = get_container_uuid(container)
+            try:
+                (name, version, scale) = uuid.split("_", 3)
+                if name == self.name:
+                    l.append(Container.from_ps(self.client, container))
+            except ValueError:
                 continue
-            l.append(Container.from_ps(client, container))
         return l
+
+    def create_container(self, uuid):
+        ports = self.loadbalance.values()
+        return Container.create(
+            self.client, image=self.repo.image, name=uuid, ports=ports)
+
+    def run_containers(self):
+        containers = self.containers()
+        stream = self.client.pull(self.repo.image, stream=True)
+        capture_events(stream)
+
+        running = []
+        for i in range(1, self.scale + 1):
+            uuid = "%s_%s_%s" % (self.name, self.repo.tag, i)
+            con = self.get_container(uuid, containers)
+
+            if not con:
+                con = self.create_container(uuid=uuid)
+            else:
+                # TODO: This
+                if not self.container_up_to_date(con):
+                    self.update_container(con)
+            if not con.is_running:
+                con.start(port_bindings={5000: None})
+            running.append(con)
+        return running
+
+    def get_container(self, uuid, containers):
+        for c in containers:
+            if c.name == uuid:
+                return c
+        return None
+
+    def container_up_to_date(self, container):
+        # TOOD
+        return True
+
+    def update_container(self, container):
+        pass
 
     def start(self, **options):
         for c in self.containers(stopped=True):
@@ -128,158 +172,8 @@ class Service(object):
             log.info("Killing %s..." % c.name)
             c.kill(**options)
 
-    def scale(self, desired_num):
-        """
-        Adjusts the number of containers to the specified number and ensures they are running.
 
-        - creates containers until there are at least `desired_num`
-        - stops containers until there are at most `desired_num` running
-        - starts containers until there are at least `desired_num` running
-        - removes all stopped containers
-        """
-        if not self.can_be_scaled():
-            raise CannotBeScaledError()
-
-        # Create enough containers
-        containers = self.containers(stopped=True)
-        while len(containers) < desired_num:
-            containers.append(self.create_container())
-
-        running_containers = []
-        stopped_containers = []
-        for c in containers:
-            if c.is_running:
-                running_containers.append(c)
-            else:
-                stopped_containers.append(c)
-        running_containers.sort(key=lambda c: c.number)
-        stopped_containers.sort(key=lambda c: c.number)
-
-        # Stop containers
-        while len(running_containers) > desired_num:
-            c = running_containers.pop()
-            log.info("Stopping %s..." % c.name)
-            c.stop(timeout=1)
-            stopped_containers.append(c)
-
-        # Start containers
-        while len(running_containers) < desired_num:
-            c = stopped_containers.pop(0)
-            log.info("Starting %s..." % c.name)
-            self.start_container(c)
-            running_containers.append(c)
-
-        self.remove_stopped()
-
-    def remove_stopped(self, **options):
-        for c in self.containers(stopped=True):
-            if not c.is_running:
-                log.info("Removing %s..." % c.name)
-                c.remove(**options)
-
-    def create_container(self, one_off=False, **override_options):
-        """
-        Create a container for this service. If the image doesn't exist, attempt to pull
-        it.
-        """
-        container_options = self._get_container_create_options(override_options, one_off=one_off)
-        try:
-            return Container.create(self.client, **container_options)
-        except APIError as e:
-            if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
-                log.info('Pulling image %s...' % container_options['image'])
-                output = self.client.pull(container_options['image'], stream=True)
-                stream_output(output, sys.stdout)
-                return Container.create(self.client, **container_options)
-            raise
-
-    def recreate_containers(self, **override_options):
-        """
-        If a container for this service doesn't exist, create and start one. If there are
-        any, stop them, create+start new ones, and remove the old containers.
-        """
-        containers = self.containers(stopped=True)
-
-        if len(containers) == 0:
-            log.info("Creating %s..." % self.next_container_name())
-            container = self.create_container(**override_options)
-            self.start_container(container)
-            return [(None, container)]
-        else:
-            tuples = []
-
-            for c in containers:
-                log.info("Recreating %s..." % c.name)
-                tuples.append(self.recreate_container(c, **override_options))
-
-            return tuples
-
-    def recreate_container(self, container, **override_options):
-        if container.is_running:
-            container.stop(timeout=1)
-
-        intermediate_container = Container.create(
-            self.client,
-            image=container.image,
-            volumes_from=container.id,
-            entrypoint=['echo'],
-            command=[],
-        )
-        intermediate_container.start(volumes_from=container.id)
-        intermediate_container.wait()
-        container.remove()
-
-        options = dict(override_options)
-        options['volumes_from'] = intermediate_container.id
-        new_container = self.create_container(**options)
-        self.start_container(new_container, volumes_from=intermediate_container.id)
-
-        intermediate_container.remove()
-
-        return (intermediate_container, new_container)
-
-    def start_container(self, container=None, volumes_from=None, **override_options):
-        if container is None:
-            container = self.create_container(**override_options)
-
-        options = self.options.copy()
-        options.update(override_options)
-
-        port_bindings = {}
-
-        if options.get('ports', None) is not None:
-            for port in options['ports']:
-                port = str(port)
-                if ':' in port:
-                    external_port, internal_port = port.split(':', 1)
-                else:
-                    external_port, internal_port = (None, port)
-
-                port_bindings[internal_port] = external_port
-
-        volume_bindings = {}
-
-        if options.get('volumes', None) is not None:
-            for volume in options['volumes']:
-                if ':' in volume:
-                    external_dir, internal_dir = volume.split(':')
-                    volume_bindings[os.path.abspath(external_dir)] = {
-                        'bind': internal_dir,
-                        'ro': False,
-                    }
-
-        privileged = options.get('privileged', False)
-
-        container.start(
-            links=self._get_links(link_to_self=override_options.get('one_off', False)),
-            port_bindings=port_bindings,
-            binds=volume_bindings,
-            volumes_from=volumes_from,
-            privileged=privileged,
-        )
-        return container
-
-def get_container_name(container):
+def get_container_uuid(container):
     if not container.get('Name') and not container.get('Names'):
         return None
     # inspect

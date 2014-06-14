@@ -124,6 +124,8 @@ class Host(BaseHost):
             name=project_name)[0]
 
         authorize_group(group, 'tcp', 22, 22, '0.0.0.0/0')
+        # TODO: Stop this
+        authorize_group(group, 'tcp', 80, 80, '0.0.0.0/0')
 
         log.info("Starting a new instance for %s" % uuid)
 

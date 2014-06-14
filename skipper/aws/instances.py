@@ -24,6 +24,7 @@ class Instance(BaseInstance):
         self.project_name = project_name
         self.ec2 = ec2
         self.aws_instance = aws_instance
+        self.aws_group = None
         self.valid_size(size)
         self.valid_region(region)
         self.private_key = private_key
