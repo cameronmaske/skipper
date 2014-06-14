@@ -2,20 +2,18 @@ from regions import REGIONS
 from sizes import INSTANCE_SIZES
 
 from skipper.logger import log
-from skipper.utils import extract_version
+from skipper.instances import BaseInstance
 
-import docker
 from time import sleep
-from fabric.context_managers import settings, local_tunnel
-from fabric.api import run, sudo
-from fabric.contrib.files import contains, append
+from paramiko import RSAKey
+from StringIO import StringIO
 
 
 class InstanceNotFound(Exception):
     pass
 
 
-class Instance(object):
+class Instance(BaseInstance):
     def __repr__(self):
         return '(AWSInstance: %s [%s])' % (self.uuid, self.region)
 
@@ -77,65 +75,15 @@ class Instance(object):
             'key': self.private_key
         }
 
-    def ensure_docker_installed(self):
-        docker_version = "1.0.0"
-        with settings(**self.fabric_params):
-            install_requirements = False
-            install_docker = False
-            docker_installed = run('which docker', warn_only=True)
-            if docker_installed:
-                docker_installed_version = extract_version(
-                    run('docker --version', warn_only=True))
-                if docker_installed_version != docker_version:
-                    install_docker = True
-            else:
-                install_requirements = True
-                install_docker = True
-
-            if install_requirements:
-                log.info("Attempting to install Docker (%s)" % docker_version)
-                sudo('sh -c "wget -qO- https://get.docker.io/gpg | apt-key add -"')
-                sudo('sh -c "echo deb http://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list"')
-                sudo('apt-get update')
-                sudo('apt-get -y install linux-image-extra-virtual')
-
-            if install_docker:
-                sudo(
-                    "apt-get update -qq; apt-get install -y -o Dpkg::Options::="
-                    "'--force-confdef' -o Dpkg::Options::='--force-confold'"
-                    " lxc-docker-%s" % docker_version)
-                sleep(5)
-
-            if not contains('/etc/default/docker', 'DOCKER_OPTS="-H tcp://0.0.0.0:5555 -H unix://var/run/docker.sock"'):
-                append('/etc/default/docker', 'DOCKER_OPTS="-H tcp://0.0.0.0:5555 -H unix://var/run/docker.sock"', use_sudo=True)
-                sudo('service docker restart')
-
-    def docker_test(self):
-        # https://github.com/paramiko/paramiko/blob/master/demos/forward.py
-        from sshtunnel import SSHTunnelForwarder
-        from paramiko import RSAKey
-        from StringIO import StringIO
-
+    @property
+    def tunnel_params(self):
+        # Need to trick paramiko our string is a file.
         private_key_file = StringIO(self.private_key)
         private_key = RSAKey(file_obj=private_key_file)
 
-        server = SSHTunnelForwarder(
-            ssh_address=(self.aws_instance.public_dns_name, 22),
-            ssh_username="ubuntu",
-            ssh_private_key=private_key,
-            remote_bind_address=('127.0.0.1', 5555)
-        )
-        server.start()
-
-        print server.local_bind_port
-
-        client = docker.Client(
-            base_url="http://localhost:%s" % server.local_bind_port)
-        print "containers"
-        print client.containers()
-        print "images"
-        print client.images()
-        print "stop"
-        server.stop()
-        print "stopped"
-
+        return {
+            'ssh_address': (self.aws_instance.public_dns_name, 22),
+            'ssh_username': "ubuntu",
+            'ssh_private_key': private_key,
+            'remote_bind_address': ('127.0.0.1', 5555)
+        }

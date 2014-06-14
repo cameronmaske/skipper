@@ -8,7 +8,15 @@ import os
 import docker
 
 
+from containers import Container
+
+
 class Service(object):
+    """
+    Derived from fig's Service class.
+
+    LICENSE: https://github.com/orchardup/fig/blob/master/LICENSE
+    """
     def __repr__(self):
         return '(Service: %s)' % self.name
 
@@ -22,13 +30,11 @@ class Service(object):
 
         self.scale = kwargs.get('scale', 1)
         loadbalance = kwargs.get('loadbalance', [])
-        clean_loadbalance = []
+        self.loadbalance = {}
         for port in loadbalance:
             if type(port) == str:
                 port = parse_port(port)
-            clean_loadbalance.append(port)
-
-        self.loadbalance = clean_loadbalance
+            self.loadbalance.update(port)
 
     @property
     def repo(self):
@@ -96,6 +102,193 @@ class Service(object):
             self.repo.upload(image_id, tag)
             self.repo.tag = tag
             log.info("Successfully pushed %s:%s" % (self.name, tag))
+
+    def containers(self, client, stopped=False, one_off=False):
+        l = []
+        for container in client.containers(all=stopped):
+            name = get_container_name(container)
+            if not name:
+                continue
+            l.append(Container.from_ps(client, container))
+        return l
+
+    def start(self, **options):
+        for c in self.containers(stopped=True):
+            if not c.is_running:
+                log.info("Starting %s..." % c.name)
+                self.start_container(c, **options)
+
+    def stop(self, **options):
+        for c in self.containers():
+            log.info("Stopping %s..." % c.name)
+            c.stop(**options)
+
+    def kill(self, **options):
+        for c in self.containers():
+            log.info("Killing %s..." % c.name)
+            c.kill(**options)
+
+    def scale(self, desired_num):
+        """
+        Adjusts the number of containers to the specified number and ensures they are running.
+
+        - creates containers until there are at least `desired_num`
+        - stops containers until there are at most `desired_num` running
+        - starts containers until there are at least `desired_num` running
+        - removes all stopped containers
+        """
+        if not self.can_be_scaled():
+            raise CannotBeScaledError()
+
+        # Create enough containers
+        containers = self.containers(stopped=True)
+        while len(containers) < desired_num:
+            containers.append(self.create_container())
+
+        running_containers = []
+        stopped_containers = []
+        for c in containers:
+            if c.is_running:
+                running_containers.append(c)
+            else:
+                stopped_containers.append(c)
+        running_containers.sort(key=lambda c: c.number)
+        stopped_containers.sort(key=lambda c: c.number)
+
+        # Stop containers
+        while len(running_containers) > desired_num:
+            c = running_containers.pop()
+            log.info("Stopping %s..." % c.name)
+            c.stop(timeout=1)
+            stopped_containers.append(c)
+
+        # Start containers
+        while len(running_containers) < desired_num:
+            c = stopped_containers.pop(0)
+            log.info("Starting %s..." % c.name)
+            self.start_container(c)
+            running_containers.append(c)
+
+        self.remove_stopped()
+
+    def remove_stopped(self, **options):
+        for c in self.containers(stopped=True):
+            if not c.is_running:
+                log.info("Removing %s..." % c.name)
+                c.remove(**options)
+
+    def create_container(self, one_off=False, **override_options):
+        """
+        Create a container for this service. If the image doesn't exist, attempt to pull
+        it.
+        """
+        container_options = self._get_container_create_options(override_options, one_off=one_off)
+        try:
+            return Container.create(self.client, **container_options)
+        except APIError as e:
+            if e.response.status_code == 404 and e.explanation and 'No such image' in str(e.explanation):
+                log.info('Pulling image %s...' % container_options['image'])
+                output = self.client.pull(container_options['image'], stream=True)
+                stream_output(output, sys.stdout)
+                return Container.create(self.client, **container_options)
+            raise
+
+    def recreate_containers(self, **override_options):
+        """
+        If a container for this service doesn't exist, create and start one. If there are
+        any, stop them, create+start new ones, and remove the old containers.
+        """
+        containers = self.containers(stopped=True)
+
+        if len(containers) == 0:
+            log.info("Creating %s..." % self.next_container_name())
+            container = self.create_container(**override_options)
+            self.start_container(container)
+            return [(None, container)]
+        else:
+            tuples = []
+
+            for c in containers:
+                log.info("Recreating %s..." % c.name)
+                tuples.append(self.recreate_container(c, **override_options))
+
+            return tuples
+
+    def recreate_container(self, container, **override_options):
+        if container.is_running:
+            container.stop(timeout=1)
+
+        intermediate_container = Container.create(
+            self.client,
+            image=container.image,
+            volumes_from=container.id,
+            entrypoint=['echo'],
+            command=[],
+        )
+        intermediate_container.start(volumes_from=container.id)
+        intermediate_container.wait()
+        container.remove()
+
+        options = dict(override_options)
+        options['volumes_from'] = intermediate_container.id
+        new_container = self.create_container(**options)
+        self.start_container(new_container, volumes_from=intermediate_container.id)
+
+        intermediate_container.remove()
+
+        return (intermediate_container, new_container)
+
+    def start_container(self, container=None, volumes_from=None, **override_options):
+        if container is None:
+            container = self.create_container(**override_options)
+
+        options = self.options.copy()
+        options.update(override_options)
+
+        port_bindings = {}
+
+        if options.get('ports', None) is not None:
+            for port in options['ports']:
+                port = str(port)
+                if ':' in port:
+                    external_port, internal_port = port.split(':', 1)
+                else:
+                    external_port, internal_port = (None, port)
+
+                port_bindings[internal_port] = external_port
+
+        volume_bindings = {}
+
+        if options.get('volumes', None) is not None:
+            for volume in options['volumes']:
+                if ':' in volume:
+                    external_dir, internal_dir = volume.split(':')
+                    volume_bindings[os.path.abspath(external_dir)] = {
+                        'bind': internal_dir,
+                        'ro': False,
+                    }
+
+        privileged = options.get('privileged', False)
+
+        container.start(
+            links=self._get_links(link_to_self=override_options.get('one_off', False)),
+            port_bindings=port_bindings,
+            binds=volume_bindings,
+            volumes_from=volumes_from,
+            privileged=privileged,
+        )
+        return container
+
+def get_container_name(container):
+    if not container.get('Name') and not container.get('Names'):
+        return None
+    # inspect
+    if 'Name' in container:
+        return container['Name']
+    # ps
+    for name in container['Names']:
+        if len(name.split('/')) == 2:
+            return name[1:]
 
 
 def check_already_uploaded(image_id, tags):

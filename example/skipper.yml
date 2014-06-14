@@ -2,6 +2,8 @@ name: demo
 services:
     web:
         build: .
+        loadbalance:
+            - "80:5000"
         repo:
             name: cameronmaske/flask-web
 groups:
@@ -9,9 +11,8 @@ groups:
         size: t1.micro
         loadbalance:
             - "80:80"
-        scale: 2
+        scale: 1
         regions:
             - us-east-1
-            - us-west-1
         services:
             - web

@@ -2,8 +2,6 @@ from boto import ec2, exception
 from time import sleep
 from regions import REGIONS
 
-from skipper.logger import log
-
 
 class EC2(object):
     """
@@ -84,14 +82,11 @@ class EC2(object):
         reservation = self.call(region).run_instances(ami_image, **kwargs)
         instance = reservation.instances[0]
 
-        log.info("Creating new instance")
-
         while instance.state != 'running':
             sleep(1)
             instance.update()
 
-        log.info("Successfully created instance")
-        sleep(5)
+        sleep(10)
 
         return instance
 

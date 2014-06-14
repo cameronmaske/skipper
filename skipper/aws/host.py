@@ -98,6 +98,7 @@ class Host(BaseHost):
             })
 
         try:
+            log.info("Checking for %s" % uuid)
             aws_instance = aws_instances[0]
             instance = Instance(
                 uuid=uuid,
@@ -108,8 +109,10 @@ class Host(BaseHost):
                 size=size,
                 region=region,
             )
+            log.info("Successfully found %s" % uuid)
             return instance
         except IndexError:
+            log.info("Failed to find %s" % uuid)
             raise InstanceNotFound()
 
     def create_instance(self, uuid, project_name, **kwargs):
@@ -121,6 +124,8 @@ class Host(BaseHost):
             name=project_name)[0]
 
         authorize_group(group, 'tcp', 22, 22, '0.0.0.0/0')
+
+        log.info("Starting a new instance for %s" % uuid)
 
         aws_instance = self.ec2().create_instance(
             region=region,
@@ -141,22 +146,18 @@ class Host(BaseHost):
             size=size,
             region=region,
         )
+
+        log.info("Successfully created instance for %s" % uuid)
         return instance
 
-    def make_instance(self, name, project_name, **kwargs):
-        return Instance(
-            name=name,
-            project_name=project_name,
-            ec2=self.ec2(),
-            **kwargs
-        )
-
-    def make_group(self, services, instances, loadbalancer):
+    def make_group(self, name, services, instances, loadbalance=None):
         return AWSGroup(
+            name=name,
+            project_name=self.project_name,
+            ec2=self.ec2,
             services=services,
             instances=instances,
-            loadbalancer=loadbalancer,
-            ec2=self.ec2(),
+            loadbalance=loadbalance,
         )
 
 
