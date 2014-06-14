@@ -1,0 +1,12 @@
+{% for program in programs %}
+[program:{{ program.name }}]
+command={{program.command}}
+autostart=true
+autorestart=true
+stopsignal=KILL
+stdout_logfile=syslog
+stderr_logfile=syslog
+user=ubuntu
+killasgroup=true
+stopasgroup=true
+{% endfor %}

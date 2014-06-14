@@ -1,0 +1,26 @@
+user www-data;
+worker_processes 4;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 768;
+    # multi_accept on;
+}
+
+http {
+    {% for c in containers %}
+    upstream {{c.name}} {
+        {% for p in c.ports %}
+        server localhost:{{p}};
+        {% endfor %}
+    }
+    {% endfor %}
+    {% for lb in loadbalance %}
+    server {
+        listen {{ lb.port }};
+        location / {
+            proxy_pass http://{{ lb.container }};
+        }
+    }
+    {% endfor %}
+}
