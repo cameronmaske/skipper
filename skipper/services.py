@@ -1,5 +1,5 @@
 from __future__ import unicode_literals
-from loadbalancer.helpers import parse_port
+from loadbalancer.helpers import parse_ports
 from builder import Repo, RepoNotFound
 from logger import log, capture_events
 
@@ -22,13 +22,8 @@ class Service(object):
 
         self.scale = kwargs.get('scale', 1)
         loadbalance = kwargs.get('loadbalance', [])
-        clean_loadbalance = []
-        for port in loadbalance:
-            if type(port) == str:
-                port = parse_port(port)
-            clean_loadbalance.append(port)
-
-        self.loadbalance = clean_loadbalance
+        self.loadbalance = parse_ports(loadbalance)
+        self.client = None
 
     @property
     def repo(self):

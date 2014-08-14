@@ -5,6 +5,7 @@ from skipper.builder import Repo
 import pytest
 import mock
 
+
 def test_init():
     service = Service(
         name="test",
@@ -16,7 +17,7 @@ def test_init():
 
     assert service.name == "test"
     assert service.build == "."
-    assert service.loadbalance == [{80: 80}]
+    assert service.loadbalance == {80: 80}
     assert service.scale == 10
     assert isinstance(service.repo, Repo)
     assert service.repo.name == "cameronmaske/flask-web"

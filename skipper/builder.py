@@ -19,6 +19,13 @@ class Repo(object):
         self.registry = registry
         self.tag = tag
 
+    @property
+    def image(self):
+        # Example: localhost:5000/registry-demo:v12
+        if self.tag:
+            return "%s:%s" % (self.name, self.tag)
+        return self.name
+
     def get_tags(self):
         """
         Attempts to retrieve all the tags associated with a repo.

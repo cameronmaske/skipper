@@ -1,4 +1,0 @@
-skipper:
-  build: .
-  volumes:
-    - .:/code
