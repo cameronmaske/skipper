@@ -32,3 +32,11 @@ INSTANCE_SIZES = {
         'cost': 0.52
     }
 }
+
+
+def valid_size(size):
+    if size in INSTANCE_SIZES.keys():
+        return size
+    else:
+        raise TypeError("%s is not a valid size" % size)
+

@@ -30,7 +30,6 @@ setup(
     version='0.0.1',
     py_modules=['skipper'],
     include_package_data=True,
-    dependency_links=['git+git://github.com/lfasnacht/fabric.git@local_tunnel#egg=fabric'],
     install_requires=install_requires,
     tests_require=['pytest'],
     cmdclass={'test': PyTest},

@@ -27,7 +27,7 @@ def test_make_service(project):
     assert isinstance(service, Service)
     assert service.name == 'web'
     assert service.build == '.'
-    assert service.loadbalance == [{80: 5000}]
+    assert service.loadbalance == {80: 5000}
     assert service.scale == 2
     assert isinstance(service.repo, Repo)
     assert service.repo.name == "cameronmaske/flask-web"

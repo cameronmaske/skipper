@@ -1,5 +1,6 @@
 from boto import ec2, exception
 from time import sleep
+from regions import REGIONS
 
 
 class EC2(object):
@@ -20,14 +21,11 @@ class EC2(object):
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key)
 
-    def get_or_create_key(self, name, region='us-east-1'):
+    def get_key(self, name, region='us-east-1'):
         """
-        Attempts to get or create a KeyPair based on a name.
-        Returns the (key, created)
-        key: is the KeyPair from EC2.
-        created: is a boolean indicating if the group was created.
+        Attempts to get KeyPair based on a name.
+        Returns the key
         """
-        created = False
         try:
             # Fun fact: Different regions handle this query very differently.
             # If you query any US region, if no key matches, it will raise an
@@ -42,8 +40,23 @@ class EC2(object):
                     raise e
             key = keys[0]
         except IndexError:
-            key = self.call(region).create_key_pair(name)
-        return key, created
+            return None
+        return key
+
+    def import_key(self, name, public_key_material, region='us-east-1'):
+        """
+        Imports an existing public key to KeyPair
+        """
+        return self.call(region).import_key_pair(
+            key_name=name,
+            public_key_material=public_key_material)
+
+    def create_key(self, name, region='us-east-1'):
+        """
+        Attempts to create a KeyPair based on a name.
+        """
+        key = self.call(region).create_key_pair(name)
+        return key
 
     def get_or_create_group(self, name, description=None, region='us-east-1'):
         """
@@ -63,28 +76,28 @@ class EC2(object):
             group = self.call(region).create_security_group(name, description)
         return group, created
 
-    def filter_instances(self, filters, ignore_terminated=True, region='us-east-1'):
+    def filter_instances(self, filters, ignore=["terminated", "shutting-down"], region='us-east-1'):
         """
         Query for instances based on filters passed in.
         """
         instances = self.call(region).get_only_instances(filters=filters)
 
         # By default, we want to ignore removed instances.
-        if ignore_terminated:
-            instances = [i for i in instances if i.state != "terminated"]
+        if ignore:
+            instances = [i for i in instances if i.state not in ignore]
 
         return instances
 
     def create_instance(self, region='us-east-1', **kwargs):
-        reservation = self.call(region).run_instances(**kwargs)
+        ami_image = REGIONS[region]['ami']
+        reservation = self.call(region).run_instances(ami_image, **kwargs)
         instance = reservation.instances[0]
 
         while instance.state != 'running':
-            sleep(2)
+            sleep(1)
             instance.update()
 
-        print("Instance running. Waiting 5 seconds.")
-        sleep(5)
+        sleep(30)
 
         return instance
 
@@ -92,7 +105,7 @@ class EC2(object):
         self.call(region).terminate_instances(instance_ids=[instance.id])
 
 
-def authorize_group(group, ip_protocol, from_port, to_port, cidr_ip, retries=5):
+def authorize_group(group, ip_protocol, from_port, to_port, to_ip=None, to_group=None, retries=5):
     """
     Checks if a group has the correct protocol already authorized, else
     attempts to authorize them.
@@ -106,7 +119,7 @@ def authorize_group(group, ip_protocol, from_port, to_port, cidr_ip, retries=5):
     # Tries 5 times by default. Fail safe if boto's API is down.
     for i in range(retries):
         try:
-            group.authorize(ip_protocol, from_port, to_port, cidr_ip)
+            group.authorize(ip_protocol, from_port, to_port, to_ip, to_group)
             break
         except exception.EC2ResponseError as e:
             if e.code == 'InvalidPermission.Duplicate':

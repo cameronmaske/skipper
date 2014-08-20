@@ -1,77 +1,90 @@
-from skipper.exceptions import ConfigurationException
 from regions import REGIONS
 from sizes import INSTANCE_SIZES
 
-import docker
+from skipper.logger import log
+from skipper.instances import BaseInstance
+
 from time import sleep
-from fabric.context_managers import settings, local_tunnel
-from fabric.api import run, sudo
-from fabric.contrib.files import contains, append
+from paramiko import RSAKey
 
 
-class Instance(object):
-    def __init__(self, name, scale=1, size="t1.micro", region="us-east-1", loadbalance=None):
-        self.name = name
-        self.scale = scale
+class Instance(BaseInstance):
+    def __repr__(self):
+        return '(AWSInstance: %s [%s])' % (self.uuid, self.region)
+
+    def __init__(
+            self, host, uuid, project_name, ec2, boto_instance,
+            size="t1.micro", region="us-east-1"):
+        self.host = host
+        self.uuid = uuid
+        self.project_name = project_name
+        self.ec2 = ec2
+        self.boto_instance = boto_instance
+        self.aws_group = None
         self.valid_size(size)
         self.valid_region(region)
-        self.loadbalance = loadbalance
-
-    @property
-    def uuid(self):
-        # web_1_us-east-1
-        return "%s_%s_%s" % (self.name, self.scale, self.region)
 
     def valid_size(self, size):
         if size in INSTANCE_SIZES.keys():
             self.size = size
         else:
-            raise ConfigurationException("%s is not a valid size" % self.size)
+            raise TypeError("%s is not a valid size" % self.size)
 
     def valid_region(self, region):
         if region in REGIONS.keys():
             self.region = region
         else:
-            raise ConfigurationException("%s is not a valid region" % self.region)
+            raise TypeError("%s is not a valid region" % self.region)
 
-    def to_aws(self, project_name):
-        image_id = REGIONS[self.region]['ami']
+    def update(self):
+        """
+        Ensures the image has the correct size.
+        """
+        if self.size != self.boto_instance.instance_type:
+            # TOOD: Improve these log messages.
+            log.info("Updating %s (%s -> %s)" % (
+                self.uuid, self.boto_instance.instance_type, self.size))
+
+            self.boto_instance.stop()
+            log.info("Stopping %s" % self.uuid)
+            while self.boto_instance.state != 'stopped':
+                sleep(1)
+                self.boto_instance.update()
+
+            log.info("Updating %s" % self.uuid)
+            self.boto_instance.modify_attribute(
+                'instanceType', self.size
+            )
+
+            log.info("Starting %s" % self.uuid)
+            self.boto_instance.start()
+
+            while self.boto_instance.state != 'running':
+                sleep(1)
+                self.boto_instance.update()
+
+    def delete(self):
+        self.boto_instance.terminate()
+        sleep(5)
+
+    def status(self):
+        return "[%s] Up and running - (%s)" % (self.uuid, self.boto_instance.public_dns_name)
+
+    @property
+    def fabric_params(self):
+        return {
+            'user': 'core',
+            'host_string': self.boto_instance.public_dns_name,
+            'key': self.host.private_key.read()
+        }
+
+    @property
+    def tunnel_params(self):
+        private_key = RSAKey(file_obj=self.host.private_key)
 
         return {
-            'image_id': image_id,
-            'instance_type': self.size,
-            'security_groups': [project_name],
-            'key_name': project_name,
-            'region': self.region
+            'ssh_address': (self.boto_instance.public_dns_name, 22),
+            'ssh_username': "ubuntu",
+            'ssh_private_key': private_key,
+            'remote_bind_address': ('127.0.0.1', 5555)
         }
-
-    def config_from_aws(self, boto_instance, private_key):
-        self.fabric_params = {
-            'user': 'ubuntu',
-            'host_string': boto_instance.public_dns_name,
-            'key': private_key,
-        }
-
-    def ensure_docker_installed(self):
-        with settings(**self.fabric_params):
-            installed = run('which docker', warn_only=True)
-            if not installed:
-                print("Attempting to install Docker.")
-                sudo('sh -c "wget -qO- https://get.docker.io/gpg | apt-key add -"')
-                sudo('sh -c "echo deb http://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list"')
-                sudo('apt-get update')
-                sudo('apt-get -y install linux-image-extra-virtual')
-                sudo('apt-get -y install lxc-docker-0.11.0')
-                sudo('apt-get update')
-                sleep(10)
-
-            if not contains('/etc/default/docker', 'DOCKER_OPTS="-H tcp://0.0.0.0:5555 -H unix://var/run/docker.sock"'):
-                append('/etc/default/docker', 'DOCKER_OPTS="-H tcp://0.0.0.0:5555 -H unix://var/run/docker.sock"', use_sudo=True)
-                sudo('service docker restart')
-
-    def docker_client(self):
-        with settings(**self.fabric_params):
-            with local_tunnel(5555, bind_port=59432):
-                client = docker.Client(base_url="http://localhost:59432")
-                return client
-
