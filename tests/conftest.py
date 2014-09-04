@@ -1,7 +1,7 @@
 from skipper.services import Service
 from skipper.project import Project
-from skipper.builder import Repo
 
+from docker import Client
 import pytest
 import mock
 
@@ -18,22 +18,26 @@ def project(host):
 
 
 @pytest.fixture
-def repo():
-    repo = Repo(
-        name="cameronmaske/flask-web",
-        registry="index.docker.io"
-    )
-    return repo
-
-
-@pytest.fixture
-def service(repo):
-    service = Service(name="service", repo=repo)
+def service():
+    service = Service(
+        name="service",
+        repo={
+            'name': "cameronmaske/flask-web",
+        })
+    service.client = mock.Mock(spec_set=Client)
     return service
 
 
 @pytest.fixture
 def services(repo):
-    service1 = Service(name="service1", repo="cameronmaske/flask-web")
-    service2 = Service(name="service2", repo="cameronmaske/node-web")
+    service1 = Service(
+        name="service1",
+        repo={
+            'name': "cameronmaske/flask-web"
+        })
+    service2 = Service(
+        name="service2",
+        repo={
+            'name': "cameronmaske/node-web"
+        })
     return [service1, service2]

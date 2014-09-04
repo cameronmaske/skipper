@@ -2,18 +2,18 @@ import click
 from click.exceptions import FileError, ClickException
 
 
-from project import Project, NoSuchService
+from project import Project
+from services import split_tags_and_services
 from instances import InstanceNotFound
 from hosts import get_host
 from creds import creds
 from conf import get_conf
 from logger import log
-from builder import RepoNoPermission
 from formatter import instance_table
+from exceptions import cli_exceptions
 
 
 class CLIProject(Project):
-
     def __init__(self):
         try:
             self.conf = get_conf()
@@ -42,24 +42,69 @@ pass_project = click.make_pass_decorator(CLIProject, ensure=True)
 @pass_project
 def cli(project, silent):
     """
+
     Doc string describing the CLI at a glance.
     """
     log.propagate = silent
 
 
 @cli.command()
-@click.argument('services', nargs=-1, required=False)
+@click.argument('tagged_services', nargs=-1, required=False)
 @pass_project
-def build(project, services):
+def tag(project, tagged_services):
     """
-    Build and upload service(s).
+    Build and tag a service(s).
+
+    Example:
+
+        `skipper tag web:v11`
+
     """
-    try:
-        services = project.filter_services(services)
+    items = split_tags_and_services(tagged_services)
+    services = project.filter_services(items.keys())
+    with cli_exceptions():
         for service in services:
-            service.push()
-    except (RepoNoPermission, NoSuchService) as e:
-        raise ClickException(e.message)
+            tag = items.get(service.name)
+            service.create_tag(tag=tag)
+
+
+@cli.command()
+@click.argument('tagged_services', nargs=-1, required=False)
+@pass_project
+def push(project, tagged_services):
+    """
+    Push a service's tag to it's registry.
+
+    Example:
+
+        `skipper push web:v11`
+
+    """
+    items = split_tags_and_services(tagged_services)
+    services = project.filter_services(items.keys())
+    with cli_exceptions():
+        for service in services:
+            tag = items.get(service.name)
+            service.push(tag=tag)
+
+
+@cli.command()
+@click.argument('services', nargs=-1, required=False)
+@click.option('--cutoff', default=10, help='Number of most recent images to keep.')
+@pass_project
+def clean(project, services, cutoff):
+    """
+    Removes older images locally for a services.
+
+    Example:
+
+        `skipper clean web --cutoff 20`
+
+    """
+    services = project.filter_services(services)
+    with cli_exceptions():
+        for service in services:
+            service.clean_images(cutoff=cutoff)
 
 
 @cli.group()

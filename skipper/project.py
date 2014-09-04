@@ -1,8 +1,5 @@
 from services import Service
-
-
-class NoSuchService(Exception):
-    pass
+from exceptions import NoSuchService
 
 
 class Project(object):
@@ -18,8 +15,7 @@ class Project(object):
         return "Project (%s)" % self.name
 
     def make_service(self, name, **kwargs):
-        service = Service(name=name, **kwargs)
-        return service
+        return Service(name=name, **kwargs)
 
     def get_service(self, name):
         """

@@ -2,8 +2,8 @@ name: demo
 services:
     web:
         build: .
-        loadbalance:
-            - "5000"
+        ports:
+            - "80:5000"
         repo:
             name: cameronmaske/flask-web
 groups:
