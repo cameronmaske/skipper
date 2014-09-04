@@ -2,6 +2,7 @@ from skipper.project import Project, NoSuchService
 from skipper.services import Service
 
 import pytest
+import mock
 
 
 def test_init(host):
@@ -65,3 +66,17 @@ def test_filter_services(project):
     with pytest.raises(NoSuchService):
         project.filter_services(["no-service"])
 
+
+def test_filter_groups(project):
+    group1 = mock.Mock(services=["web"])
+    group2 = mock.Mock(services=["web", "redis"])
+    project.groups = [group1, group2]
+
+    found = project.filter_groups(services=["web"])
+    assert found == [group1, group2]
+
+    found = project.filter_groups(services=["redis", "celery"])
+    assert found == [group2]
+
+    found = project.filter_groups(services=["celery"])
+    assert found == []

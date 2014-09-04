@@ -1,7 +1,9 @@
 from skipper.services import Service
 from skipper.project import Project
+from skipper.fleet import Fleet
 
 from docker import Client
+from requests import Response
 import pytest
 import mock
 
@@ -41,3 +43,18 @@ def services(repo):
             'name': "cameronmaske/node-web"
         })
     return [service1, service2]
+
+
+@pytest.fixture
+def fleet():
+    fleet = Fleet(port=6001)
+    return fleet
+
+
+@pytest.fixture
+def response():
+    response = mock.Mock(spec_set=Response)
+    return response
+
+
+

@@ -10,7 +10,6 @@ def aws_instance():
         host=mock.MagicMock(),
         uuid="uuid",
         project_name="project_name",
-        ec2=mock.MagicMock(),
         boto_instance=mock.MagicMock())
     return instance
 

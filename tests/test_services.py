@@ -15,7 +15,9 @@ def test_init():
             "name": "cameronmaske/flask-web"
         },
         build=".",
-        ports=["80:80"],
+        ports={
+            80: 80
+        },
         scale=10
     )
 
@@ -120,6 +122,14 @@ def test_create_tag(service):
         image="abc", repository="cameronmaske/flask-web", tag="v1"
     )
     assert image_id == "abc"
+
+
+def test_run_command(service):
+    service.ports = {
+        80: 5000,
+        9200: None
+    }
+    assert service.run_command(tag="v1", scale=1) == "/usr/bin/docker run --rm --name service_1 --publish 80:5000 9200 cameronmaske/flask-web:v1"
 
 
 def test_outdated_images():

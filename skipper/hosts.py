@@ -1,8 +1,6 @@
 import click
 import os
 
-from utils import missing_keys
-
 
 def get_host(host):
     """
@@ -41,19 +39,11 @@ class BaseHost(object):
             "public": public
         }
 
-    def check_requirements(self):
+    def get_etcd_token(self):
         if not self.creds['COREOS']['ETCD_TOKEN']:
             click.echo('No token set for your etcd cluster.')
             self.creds['COREOS']['ETCD_TOKEN'] = click.prompt(
                 'Please visit https://discovery.etcd.io/new to generate a new',
                 ' one, or enter your existing one')
             self.creds.save()
-
-        field = self.requirements['field']
-        missing = missing_keys(self.requirements['keys'], self.creds[field])
-        if len(missing) != 0:
-            click.utils.echo(self.requirements['message'])
-            for key, message in self.requirements['keys'].iteritems():
-                self.creds[field][key] = click.prompt(message)
-                self.creds.save()
-
+        return self.creds['COREOS']['ETCD_TOKEN']

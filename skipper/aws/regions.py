@@ -25,7 +25,7 @@ REGIONS = {
     },
     'us-east-1': {
         'name': "US East (Northern Virginia) Region",
-        'ami': "ami-04a2766c"
+        'ami': "ami-7cbc1914"
     },
     'us-west-1': {
         'name': "US West (Northern California) Region",

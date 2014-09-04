@@ -2,17 +2,17 @@ name: demo
 services:
     web:
         build: .
+        scale: 1
         ports:
             - "80:5000"
         repo:
             name: cameronmaske/flask-web
+region: us-east-1
 groups:
     web:
         size: t1.micro
-        loadbalance:
-            - "80:5000"
-        scale: 1
-        regions:
-            - us-east-1
+        ports:
+            public:
+                - "80"
         services:
             - web
