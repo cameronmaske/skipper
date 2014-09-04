@@ -1,133 +1,124 @@
 from __future__ import unicode_literals
-from loadbalancer.helpers import parse_ports
-from builder import Repo, RepoNotFound
-from logger import log, capture_events
+from ports import parse_ports_dict
+from logger import log, capture_events, EventError
+from exceptions import (
+    ServiceException, RepoNotFound, RepoNoPermission)
 
 import re
 import os
 import docker
+import requests
 
 
 class Service(object):
     def __repr__(self):
         return '(Service: %s)' % self.name
 
-    def __init__(self, name, *args, **kwargs):
+    def __init__(self, name, repo, *args, **kwargs):
         self.name = name
+        self.repo = repo
         self.build = kwargs.get('build')
-        self._repo = None
-        self.repo = kwargs.get('repo')
-        if not self.repo:
-            raise TypeError("An repo must be declared for each service.")
-
         self.scale = kwargs.get('scale', 1)
-        loadbalance = kwargs.get('loadbalance', [])
-        self.loadbalance = parse_ports(loadbalance)
-        self.client = None
-
-    @property
-    def repo(self):
-        return self._repo
-
-    @repo.setter
-    def repo(self, repo):
-        """
-        Sets the repo.
-        Turns "cameron/flask-web" into Repo(
-            repo="cameron/flask-web"
-            index="index.docker.io"
-        )
-        """
-        if isinstance(repo, Repo):
-            self._repo = repo
-            return
-        elif isinstance(repo, str):
-            name = repo
-            registry = "index.docker.io"
-        else:
-            try:
-                name = repo['name']
-            except:
-                raise TypeError("Image doesn't contain a valid repo.")
-            registry = repo.get('registry', "index.docker.io")
-
-        self._repo = Repo(**{
-            'name': name,
-            'registry': registry
-        })
+        self.ports = parse_ports_dict(kwargs.get('ports', []))
+        self.client = docker.Client(os.environ.get('DOCKER_HOST'))
 
     def build_image(self):
+        """
+        Attempts to build an image for the service.
+
+        Returns
+            * A string of the docker image's id.
+        """
         if self.build:
             log.info("Building %s..." % self.name)
-            client = docker.Client(os.environ.get('DOCKER_HOST'))
-            stream = client.build(self.build, rm=True, stream=True)
+            stream = self.client.build(self.build, rm=True, stream=True)
             all_events = capture_events(stream)
             image_id = image_id_from_events(all_events)
             log.info("Successfully built %s..." % self.name)
             return image_id
         else:
-            # TODO: Service exception?
-            raise Exception("Cannot build. No build path defined.")
+            raise ServiceException("Cannot build. No build path defined.")
 
-    def push(self):
-        if self.build:
-            image_id = self.build_image()
-            self.upload(image_id)
+    def clean_images(self, cutoff=10):
+        """
+        Cleans out older images. By default keeps the 10 most recent ones.
+        """
+        images = self.client.images(name=self.repo['name'], all=True)
+        outdated = outdated_images(images=images, cutoff=cutoff)
+        for image in outdated:
+            self.client.remove_image(image, force=True)
 
-    def upload(self, image_id):
+    def push(self, tag):
+        """
+        Uploads a tagged version to the repo.
+        """
+        output = self.client.push(self.repo['name'], tag=tag, stream=True)
         try:
-            tags = self.repo.get_tags()
-        except RepoNotFound:
-            tags = {}
+            capture_events(output)
+        except EventError as e:
+            if "401" in e.message:
+                raise RepoNoPermission(
+                    "You currently do not have access to %s.\nPlease try "
+                    "logging in with `docker login`." % self.name)
+            elif "403" in e.message:
+                raise RepoNoPermission(
+                    "You currently do not have access to %s.\nPlease make "
+                    "sure you have the correct permissions" % self.name)
 
-        exists = check_already_uploaded(image_id, tags)
-        if exists:
-            log.info("Already pushed %s:%s" % (self.name, exists))
-            self.repo.tag = exists
-        else:
-            version = get_next_version(tags)
-            tag = "v%s" % version
-            log.info("Pushing %s:%s to %s:%s" % (self.name, tag, self.repo.name, tag))
-            self.repo.upload(image_id, tag)
-            self.repo.tag = tag
-            log.info("Successfully pushed %s:%s" % (self.name, tag))
+    def create_tag(self, tag):
+        """
+        Builds an image and tags it.
+
+        Returns
+            * A string of the docker image's id.
+        """
+        image_id = self.build_image()
+        self.client.tag(image=image_id, repository=self.repo['name'], tag=tag)
+        return image_id
+
+    def get_remote_tags(self):
+        """
+        Retrieve all the tags associated with a repo.
+
+        Returns
+            * A list of tags, each has a layer and name.
+        """
+        r = requests.get(
+            "https://%s/v1/repositories/%s/tags" % (
+                self.repo.get('registry', "index.docker.io"),
+                self.repo['name']))
+        if r.status_code == 404:
+            raise RepoNotFound(
+                "No such repo %s" % (self.repo['name']))
+        return r.json()
 
 
-def check_already_uploaded(image_id, tags):
+def outdated_images(images, cutoff=10):
     """
-    Based on the image id and the tags, check if the service is already
-    uploaded.
+    Returns the oldest images to a cutoff (by default 10)
 
-    image_id = 12346
-    tags = [{"layer": "12346", "name": "latest"}, {"layer": "14445", "name": "v1"}]
-    """
-    for tag in tags:
-        if tag['layer'][0:8] == image_id[0:8]:
-            return tag['name']
-    return None
+    Returns
+        * A list of image names.
 
-
-def get_next_version(tags):
     """
-    Based on the tags passed in, work out the next tag to use.
-    E.g,
-    tags = [{"layer": "12346", "name": "v1"}, {"layer": "14445", "name": "v2"}]
-    return "v3"
-    """
-    highest_version = 0
-    for tag in tags:
-        try:
-            int_version = int(re.findall(r'v\d+', tag['name'])[0].replace('v', ''))
-            if int_version > highest_version:
-                highest_version = int_version
-        except IndexError:
-            pass
-    return (highest_version + 1)
+    outdated = []
+    sorted_images = sorted(
+        images, key=lambda i: i['Created'])
+    for image in sorted_images:
+        for repo in image['RepoTags']:
+            if repo not in outdated:
+                outdated.append(repo)
+                if len(outdated) >= cutoff:
+                    return outdated
+    return outdated
 
 
 def image_id_from_events(all_events):
     """
     Extracts the image id for the build output.
+
+    Returns
+        * A string of the image id.
 
     Taken from Fig.
     https://github.com/orchardup/fig/blob/master/fig/service.py
@@ -138,3 +129,42 @@ def image_id_from_events(all_events):
         if match:
             image_id = match.group(1)
     return image_id
+
+
+def split_tag_and_service(tagged_service):
+    """
+    Turns a string of a service name, possibly with a tag.
+
+    Returns:
+        * A string of the service's name
+        * A string of the tag (can be None)
+    """
+    if ":" in tagged_service:
+        service, tag = tagged_service.split(":", 1)
+    else:
+        service = tagged_service
+        tag = None
+    return service, tag
+
+
+def split_tags_and_services(tagged_services):
+    """
+    Turns a list of service, possibily with tags, into a dictonary of
+    services as the keys, and tags as the value.
+
+    Example:
+
+        ["foo:v1", "boo"]
+
+        into...
+
+        {
+            "foo": "v1",
+            "boo": None
+        }
+    """
+    cleaned = {}
+    for ts in tagged_services:
+        service, tag = split_tag_and_service(ts)
+        cleaned[service] = tag
+    return cleaned

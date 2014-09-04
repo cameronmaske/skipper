@@ -1,5 +1,4 @@
 from skipper.project import Project, NoSuchService
-from skipper.builder import Repo
 from skipper.services import Service
 
 import pytest
@@ -17,7 +16,7 @@ def test_make_service(project):
     service = project.make_service(**{
         'name': 'web',
         'build': '.',
-        'loadbalance': ["80:5000"],
+        'ports': ["80:5000", "9200"],
         'scale': 2,
         'repo': {
             'name': 'cameronmaske/flask-web'
@@ -27,11 +26,14 @@ def test_make_service(project):
     assert isinstance(service, Service)
     assert service.name == 'web'
     assert service.build == '.'
-    assert service.loadbalance == {80: 5000}
+    assert service.ports == {
+        80: 5000,
+        9200: None
+    }
     assert service.scale == 2
-    assert isinstance(service.repo, Repo)
-    assert service.repo.name == "cameronmaske/flask-web"
-    assert service.repo.registry == "index.docker.io"
+    assert service.repo == {
+        'name': "cameronmaske/flask-web",
+    }
 
 
 def test_get_service(project):

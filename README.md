@@ -59,7 +59,9 @@ CMD python app.py
 Now let's run skipper.
 
 ```
-$ skipper deploy
+$ skipper tag web:v1
+$ skipper push web:v1
+$ skipper deploy web:v1
 As this is your first time running skipper, we need to store your some AWS Security Credentials.
 Please visit https://console.aws.amazon.com/iam/home?#security_credential
 Under Access Keys, click Create New Access Key.
@@ -111,27 +113,9 @@ $ # Replace v1 with v2.
 $ sed -i -e 's/v1/v2/g' app.py
 $ cat app.py | grep Hello World
     return "Hello World! v2"
-$ git commit -am "v2"
-$ skipper deploy
-
-Checking index.docker.io for cameronmaske/flask-web.
-Outdated build found for the web service.
-Building web...
-Successfully built web:v2
-Pushing web:v2 to cameronmaske/flask-web:v2...
-Successfully pushed web:v2
-
-Deploying web:v2 to instance web
-[1/2] Pulling web:v2
-[1/2] Running 2x web:v2
-[1/2] Configuring load balancer 80 -> 5000 for 2x web:v2
-[1/2] Stopping 2x web:v1
-[2/2] Pulling web:v2
-[2/2] Running 2x web:v2
-[2/2] Configuring load balancer 80 -> 5000 for 2x web:v2
-[2/2] Stopping 2x web:v1
-
-All services are successfully deployed.
+$ skipper tag web:v2
+$ skipper push web:v2
+$ skipper deploy web:v2
 ```
 
 
