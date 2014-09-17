@@ -1,5 +1,4 @@
 from __future__ import unicode_literals
-from ports import parse_ports_dict
 from logger import log, capture_events, EventError
 from exceptions import (
     ServiceException, RepoNotFound, RepoNoPermission)
@@ -19,7 +18,7 @@ class Service(object):
         self.repo = repo
         self.build = kwargs.get('build')
         self.scale = kwargs.get('scale', 1)
-        self.ports = parse_ports_dict(kwargs.get('ports', []))
+        self.ports = kwargs.get('ports', {})
         self.client = docker.Client(os.environ.get('DOCKER_HOST'))
 
     def build_image(self):
@@ -91,6 +90,57 @@ class Service(object):
             raise RepoNotFound(
                 "No such repo %s" % (self.repo['name']))
         return r.json()
+
+    def run_command(self, tag, scale=1):
+        """
+        Generates a run command for the service.
+
+        Returns:
+            * A string of the docker run command.
+        """
+        name = "%s_%s" % (self.name, scale)
+        parts = ["/usr/bin/docker", "run", "--rm", "--name", name]
+        if self.ports:
+            parts += ["--publish"]
+            for host, container in self.ports.items():
+                if container:
+                    parts += ["%s:%s" % (str(host), str(container))]
+                else:
+                    parts += [str(host)]
+
+        parts += ["%s:%s" % (self.repo['name'], tag)]
+        return " ".join(parts)
+
+    def fleet_params(self, tag, scale=1):
+        name = "%s_%s" % (self.name, scale)
+        repo = "%s:%s" % (self.repo['name'], tag)
+        return construct_fleet_options({
+            "Unit": [
+                {"Description": self.name},
+                {"After": "docker.service"}
+            ],
+            "Service": [
+                {"TimeoutStartSec": "0"},
+                {"ExecStartPre": "-/usr/bin/docker kill %s" % name},
+                {"ExecStartPre": "-/usr/bin/docker rm %s" % name},
+                {"ExecStartPre": "/usr/bin/docker pull %s" % repo},
+                {"ExecStart": self.run_command(tag=tag, scale=scale)},
+                {"ExecStop": "/usr/bin/docker stop %s" % name}
+            ]
+        })
+
+
+def construct_fleet_options(options):
+    construct = []
+    for section in ["Unit", "Service", "Socket"]:
+        for option in options.get(section, []):
+            for name, value in option.items():
+                construct.append({
+                    "section": section,
+                    "name": name,
+                    "value": value,
+                })
+    return construct
 
 
 def outdated_images(images, cutoff=10):

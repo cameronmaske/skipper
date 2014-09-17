@@ -1,8 +1,9 @@
+from logger import log
+
 import contextlib
 import SocketServer
 import select
 import threading
-import logging
 import paramiko
 
 
@@ -18,16 +19,11 @@ def ssh_tunnel(params):
 
 # Taken from pahaz's sshtunnel.
 # https://github.com/pahaz/sshtunnel/blob/master/LICENSE
-
-class BaseSSHTunnelForwarderError(Exception):
+class SSHTunnelError(Exception):
     pass
 
 
-class HandlerSSHTunnelForwarderError(BaseSSHTunnelForwarderError):
-    pass
-
-
-class _BaseHandler(SocketServer.BaseRequestHandler):
+class BaseHandler(SocketServer.BaseRequestHandler):
     remote_address = None
     ssh_transport = None
     logger = None
@@ -43,14 +39,14 @@ class _BaseHandler(SocketServer.BaseRequestHandler):
         except Exception as e:
             m = 'Incoming request failed: {0}'.format(repr(e))
             self.logger.error(m)
-            raise HandlerSSHTunnelForwarderError(m)
+            raise SSHTunnelError(m)
 
         if chan is None:
             m = 'Incoming request was rejected'
             self.logger.error(m)
-            raise HandlerSSHTunnelForwarderError(m)
+            raise SSHTunnelError(m)
 
-        self.logger.info('Connected! Tunnel open.')
+        self.logger.debug('Connected! Tunnel open.')
         while True:
             r, w, x = select.select([self.request, chan], [], [])
             if self.request in r:
@@ -65,33 +61,11 @@ class _BaseHandler(SocketServer.BaseRequestHandler):
                 self.request.send(data)
         chan.close()
         self.request.close()
-        self.logger.info('Tunnel closed.')
+        self.logger.debug('Tunnel closed.')
 
 
-def make_ssh_forward_handler(remote_address_, ssh_transport_, base_ssh_forward_handler=None):
-    """
-    Make SSH Handler class.
-    Not interesting for you.
-    """
-    H = base_ssh_forward_handler
-    if H is None:
-        H = _BaseHandler
-    if not issubclass(H, SocketServer.BaseRequestHandler):
-        m = "base_ssh_forward_handler is not a subclass " \
-            "SocketServer.BaseRequestHandler"
-        raise BaseSSHTunnelForwarderError(m)
-
-    logger_ = logging.getLogger(__name__)
-
-    class Handler(H):
-        remote_address = remote_address_
-        ssh_transport = ssh_transport_
-        logger = logger_
-
-    return Handler
-
-
-class _ForwardServer(SocketServer.TCPServer):  # Not Threading
+class ThreadingForwardServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+    daemon_threads = False
     allow_reuse_address = True
 
     @property
@@ -103,19 +77,17 @@ class _ForwardServer(SocketServer.TCPServer):  # Not Threading
         return self.socket.getsockname()[0]
 
 
-class _ThreadingForwardServer(SocketServer.ThreadingMixIn, _ForwardServer):
-    daemon_threads = False
-
-
-def make_ssh_forward_server(remote_address, local_bind_address, ssh_transport,
-                            is_threading=False):
+def make_ssh_forward_server(_remote_address, _local_bind_address, _ssh_transport):
     """
-    Make SSH forward proxy Server class.
-    Not interesting for you.
+    Makes an SSH forward proxy Server class.
     """
-    Handler = make_ssh_forward_handler(remote_address, ssh_transport)
-    Server = _ThreadingForwardServer if is_threading else _ForwardServer
-    server = Server(local_bind_address, Handler)
+
+    class SubHander(BaseHandler):
+        remote_address = _remote_address
+        ssh_transport = _ssh_transport
+        logger = log
+
+    server = ThreadingForwardServer(_local_bind_address, SubHander)
     return server
 
 
@@ -147,17 +119,14 @@ class SSHTunnelForwarder(threading.Thread):
                  ssh_private_key=None,
                  remote_bind_address=None,
                  local_bind_address=None,
-                 threaded=False):
+                 threaded=True):
         """
-        Address is (host, port)
-
-        *local_bind_address* - if is None uses ("127.0.0.1", RANDOM).
-        Use `forwarder.local_bind_port` for getting local forwarding port.
+        Remote and local address take the form: (host, port)
         """
         assert isinstance(remote_bind_address, tuple)
 
         if local_bind_address is None:
-            # use random local port
+            # Use random local port
             local_bind_address = ('', 0)
 
         self._local_bind_address = local_bind_address
@@ -172,7 +141,6 @@ class SSHTunnelForwarder(threading.Thread):
             self._remote_bind_address,
             self._local_bind_address,
             self._transport,
-            is_threading=threaded
         )
         self._is_started = False
         super(SSHTunnelForwarder, self).__init__()
@@ -191,23 +159,23 @@ class SSHTunnelForwarder(threading.Thread):
 
     def stop(self):
         if not self._is_started:
-            m = 'Server don`t started! Please .start() first!'
-            raise BaseSSHTunnelForwarderError(m)
+            m = "Server don't started! Please .start() first!"
+            raise SSHTunnelError(m)
         self._server.shutdown()
         self._transport.close()
 
     @property
     def local_bind_port(self):
         if not self._is_started:
-            m = 'Server don`t started! Please .start() first!'
-            raise BaseSSHTunnelForwarderError(m)
+            m = "Server don't started! Please .start() first!"
+            raise SSHTunnelError(m)
         return self._server.bind_port
 
     @property
     def local_bind_host(self):
         if not self._is_started:
-            m = 'Server don`t started! Please .start() first!'
-            raise BaseSSHTunnelForwarderError(m)
+            m = "Server don't started! Please .start() first!"
+            raise SSHTunnelError(m)
         return self._server.bind_host
 
     def __enter__(self):

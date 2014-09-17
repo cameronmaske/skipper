@@ -9,8 +9,8 @@ from hosts import get_host
 from creds import creds
 from conf import get_conf
 from logger import log
-from formatter import instance_table
-from exceptions import cli_exceptions
+from formatter import instance_table, service_table
+from exceptions import cli_exceptions, NoSuchService
 
 
 class CLIProject(Project):
@@ -30,7 +30,22 @@ class CLIProject(Project):
             try:
                 self.services.append(
                     self.make_service(name=name, **details))
-            except TypeError as e:
+            except (TypeError, ValueError) as e:
+                raise ClickException("%s: %s" % (name, e.message))
+
+        self.host = get_host(self.conf.get('host', 'aws'))
+        self.host.creds = creds
+        self.host.project = self
+
+        self.groups = []
+        for name, details in self.conf['groups'].items():
+            try:
+                self.groups.append(
+                    self.host.make_group(
+                        name=name,
+                        region=self.conf.get('region'),
+                        **details))
+            except (TypeError, ValueError) as e:
                 raise ClickException("%s: %s" % (name, e.message))
 
 
@@ -49,6 +64,39 @@ def cli(project, silent):
 
 
 @cli.command()
+@pass_project
+def ps(project):
+    """
+    List all services running across the cluster.
+
+    """
+    services = project.host.ps_services()
+    width, _ = click.get_terminal_size()
+    click.echo(service_table(services, width))
+
+
+@cli.command()
+@click.argument('uuid')
+@pass_project
+def remove(project, uuid):
+    """
+    Remove a running service.
+
+    Example:
+
+        `skipper remove web_1`
+
+    """
+    try:
+        click.echo('Checking for service {}'.format(uuid))
+        project.host.remove_service(uuid)
+        click.echo('Successfully removed service {}'.format(uuid))
+    except NoSuchService:
+        click.echo("Cannot find service {}".format(uuid))
+        return
+
+
+@cli.command()
 @click.argument('tagged_services', nargs=-1, required=False)
 @pass_project
 def tag(project, tagged_services):
@@ -64,7 +112,7 @@ def tag(project, tagged_services):
     services = project.filter_services(items.keys())
     with cli_exceptions():
         for service in services:
-            tag = items.get(service.name)
+            tag = items.get(service.name, "latest")
             service.create_tag(tag=tag)
 
 
@@ -84,8 +132,37 @@ def push(project, tagged_services):
     services = project.filter_services(items.keys())
     with cli_exceptions():
         for service in services:
-            tag = items.get(service.name)
+            tag = items.get(service.name, "latest")
             service.push(tag=tag)
+
+
+@cli.command()
+@click.argument('tagged_services', nargs=-1, required=False)
+@pass_project
+def deploy(project, tagged_services):
+    """
+    Deploy a service across the cluster.
+
+    Example:
+
+        `skipper deploy web:v11`
+
+    """
+    items = split_tags_and_services(tagged_services)
+    services = project.filter_services(items.keys())
+    with cli_exceptions():
+        for service in services:
+            groups = project.filter_groups(
+                services=[s.name for s in services])
+            for group in groups:
+                instances = project.host.get_or_create_instances(
+                    name=group.name, **group.details())
+                project.host.configure_group(instances, group)
+                tag = items.get(service.name, "latest")
+                project.host.run_service(
+                    instances=instances,
+                    service=service,
+                    tag=tag)
 
 
 @cli.command()
@@ -118,25 +195,19 @@ def instances_deploy(project):
     """
     Deploy all instances.
     """
-    host = get_host(project.conf.get('host', 'aws'))
-    host.creds = creds
-    host.project = project
-    host.check_requirements()
-    for name, details in project.conf['groups'].items():
-        host.get_or_create_instances(name=name, **details)
+    for group in project.groups:
+        instances = project.host.get_or_create_instances(
+            name=group.name, **group.details())
+        project.host.configure_group(instances, group)
 
 
 @instances.command('ps')
 @pass_project
-def instances_list(project):
+def instances_ps(project):
     """
     Lists all instances.
     """
-    host = get_host(project.conf.get('host', 'aws'))
-    host.creds = creds
-    host.project = project
-    host.check_requirements()
-    instances = host.all_instances()
+    instances = project.host.ps_instances()
     width, _ = click.get_terminal_size()
     click.echo(instance_table(instances, width))
 
@@ -148,16 +219,16 @@ def instances_remove(project, uuid):
     """
     Remove a running instance.
     """
-    host = get_host(project.conf.get('host', 'aws'))
-    host.creds = creds
-    host.project = project
-    host.check_requirements()
     try:
-        instance = host.get_instance(uuid, project.name)
+        instance = project.host.get_instance(uuid, project.name)
     except InstanceNotFound:
         click.echo("Cannot find {}".format(uuid))
         return
     if click.confirm("Are you use want to remove this instance?"):
+        try:
+            instance.unregister()
+        except:
+            pass
         instance.delete()
         click.echo("Instance has been successfully removed.")
 
@@ -169,12 +240,8 @@ def instances_ssh(project, uuid):
     """
     SSH into a running instance.
     """
-    host = get_host(project.conf.get('host', 'aws'))
-    host.creds = creds
-    host.project = project
-    host.check_requirements()
     try:
-        instance = host.get_instance(uuid, project.name)
+        instance = project.host.get_instance(uuid, project.name)
     except InstanceNotFound:
         click.echo("Cannot find {}".format(uuid))
         return

@@ -97,7 +97,7 @@ class EC2(object):
             sleep(1)
             instance.update()
 
-        sleep(30)
+        sleep(45)
 
         return instance
 
@@ -117,12 +117,43 @@ def authorize_group(group, ip_protocol, from_port, to_port, to_ip=None, to_group
     """
     # TODO: Look at the rules already in a group. Saves an API call.
     # Tries 5 times by default. Fail safe if boto's API is down.
+    kwargs = {}
+    if to_ip:
+        kwargs['cidr_ip'] = to_ip
+    elif to_group:
+        kwargs['src_group'] = to_group
+
     for i in range(retries):
         try:
-            group.authorize(ip_protocol, from_port, to_port, to_ip, to_group)
+            group.authorize(ip_protocol, from_port, to_port, **kwargs)
             break
         except exception.EC2ResponseError as e:
             if e.code == 'InvalidPermission.Duplicate':
                 break
+            # Wait one second before retrying.
+            sleep(1)
+
+
+def revoke_group(group, ip_protocol, from_port, to_port, to_ip=None, to_group=None, retries=5):
+    """
+    Revokes a group's protocol, if it doesn't exists gracefully skips over it.
+
+    Usage:
+    >>> ec2 = EC2('access', 'secret')
+    >>> group = ec2.get_or_create_group('skipper')
+    >>> revoke_group(group, 'tcp', 22, 22, '0.0.0.0/0')
+    """
+
+    kwargs = {}
+    if to_ip:
+        kwargs['cidr_ip'] = to_ip
+    elif to_group:
+        kwargs['src_group'] = to_group
+
+    for i in range(retries):
+        try:
+            group.revoke(ip_protocol, from_port, to_port, **kwargs)
+            break
+        except exception.EC2ResponseError:
             # Wait one second before retrying.
             sleep(1)
