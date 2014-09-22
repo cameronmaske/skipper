@@ -62,18 +62,18 @@ class Host(BaseHost):
         """
         access = self.creds.get('AWS', {}).get('ACCESS_KEY')
         secret = self.creds.get('AWS', {}).get('SECRET_KEY')
-        if not access or not secret:
+        if not access and not secret:
             message = (
-                'The AWS Security Credentials stored are in complete. Please '
-                're-enter them. \nYou can generate them on '
-                'https://console.aws.amazon.com/iam/home?#security_credential'
+                '\nAs this is your first time running skipper, we need to store'
+                ' your some AWS Security Credentials.\nPlease visit '
+                'https://console.aws.amazon.com/iam/home?#security_credential\n'
                 'Under Access Keys, click Create New Access Key.'
             )
-        elif not access and not secret:
+        elif not access or not secret:
             message = (
-                'As this is your first time running skipper, we need to store'
-                ' your some AWS Security Credentials.\nPlease visit '
-                'https://console.aws.amazon.com/iam/home?#security_credential'
+                '\nThe AWS Security Credentials stored are incomplete. Please '
+                're-enter them. \nYou can generate them on '
+                'https://console.aws.amazon.com/iam/home?#security_credential\n'
                 'Under Access Keys, click Create New Access Key.'
             )
         if not access or not secret:
@@ -83,6 +83,7 @@ class Host(BaseHost):
             self.creds['AWS']['SECRET_KEY'] = click.prompt(
                 "Enter your Secret Access Key")
             self.creds.save()
+            click.echo('\n')
 
         return {
             "access_key": self.creds['AWS']['ACCESS_KEY'],
@@ -97,7 +98,7 @@ class Host(BaseHost):
         name = self.creds.get('AWS', {}).get('KEY_NAME')
         if not name:
             click.echo(
-                "A KeyPair, consisting of an SSH public and private key is "
+                "\nA KeyPair, consisting of an SSH public and private key is "
                 "required for access to the cluster."
             )
             name = click.prompt(
@@ -106,6 +107,7 @@ class Host(BaseHost):
             )
             self.creds['AWS']['KEY_NAME'] = name
             self.creds.save()
+            click.echo('\n')
         return name
 
     def get_or_import_key(self, region, name):
@@ -214,7 +216,7 @@ class Host(BaseHost):
         size = kwargs.get('size', "t1.micro")
         region = kwargs.get('region', "us-east-1")
 
-        log.info("Checking for instance %s" % uuid)
+        log.info("Checking for instance [%s]." % uuid)
         boto_instances = self.ec2().filter_instances(
             region=region,
             filters={
@@ -232,10 +234,10 @@ class Host(BaseHost):
                 size=size,
                 region=region,
             )
-            log.info("Successfully found instance %s" % uuid)
+            log.info("Successfully found instance [%s]." % uuid)
             return instance
         except IndexError:
-            log.info("Failed to find instance %s" % uuid)
+            log.info("Failed to find instance [%s]." % uuid)
             raise InstanceNotFound()
 
     def create_instance(self, uuid, project_name, **kwargs):
@@ -253,7 +255,7 @@ class Host(BaseHost):
         authorize_group(group, 'tcp', 7001, 7001, to_group=group)
         authorize_group(group, 'tcp', 4001, 4001, to_group=group)
 
-        log.info("Starting a new instance for %s" % uuid)
+        log.info("Starting a new instance [%s]." % uuid)
 
         config = """#cloud-config
 coreos:
@@ -300,7 +302,7 @@ coreos:
             region=region,
         )
 
-        log.info("Successfully created instance for %s" % uuid)
+        log.info("Successfully created instance [%s]." % uuid)
         return instance
 
     def ps_services(self):
@@ -333,32 +335,32 @@ coreos:
                     scale = (instance.scale + i - 1)
                     name = "%s_%s" % (service.name, scale)
                     log.info(
-                        'Checking for service %s on instance %s' %
+                        'Checking for service [%s] on instance [%s].' %
                         (name, instance.uuid))
                     create = False
                     try:
                         existing = fleet.get_unit(name=name)
                         log.info(
-                            'Found service %s, checking is up to date...'
+                            'Found service [%s], checking is up to date...'
                             % name)
                         if existing['options'] != service.fleet_params(tag=tag, scale=scale):
                             log.info(
-                                'Existing service %s is outdated, removing...'
+                                'Existing service [%s] is outdated, removing...'
                                 % name)
 
                             fleet.delete_unit(name=name)
                             create = True
                     except fleet.NotFound:
-                        log.info('No existing service %s found' % name)
+                        log.info('No existing service [%s] found.' % name)
                         create = True
 
                     if create:
-                        log.info('Creating service %s' % name)
+                        log.info('Creating service [%s].' % name)
                         fleet.create_unit(
                             machine_id=machine_id,
                             name=name,
                             options=service.fleet_params(tag=tag, scale=scale))
-                        log.info('Successfully created service %s' % name)
+                        log.info('Successfully created service [%s].' % name)
 
     def configure_group(self, instances, group):
         """

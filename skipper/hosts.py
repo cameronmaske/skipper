@@ -41,9 +41,11 @@ class BaseHost(object):
 
     def get_etcd_token(self):
         if not self.creds['COREOS']['ETCD_TOKEN']:
-            click.echo('No token set for your etcd cluster.')
+            click.echo('\nNo token set for your etcd cluster.')
             self.creds['COREOS']['ETCD_TOKEN'] = click.prompt(
-                'Please visit https://discovery.etcd.io/new to generate a new',
-                ' one, or enter your existing one')
+                'Please visit https://discovery.etcd.io/new to generate a new'
+                ' one, or enter your existing one'
+            )
             self.creds.save()
+            click.echo('\n')
         return self.creds['COREOS']['ETCD_TOKEN']

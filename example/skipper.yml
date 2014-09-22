@@ -11,6 +11,7 @@ region: us-east-1
 groups:
     web:
         size: t1.micro
+        scale: 1
         ports:
             public:
                 - "80"

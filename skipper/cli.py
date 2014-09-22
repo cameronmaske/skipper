@@ -54,11 +54,13 @@ pass_project = click.make_pass_decorator(CLIProject, ensure=True)
 
 @click.group()
 @click.option('--silent', is_flag=True, help="Suppress logging messages.")
+@click.version_option()
 @pass_project
 def cli(project, silent):
     """
+    A docker orchestration tool to build, deploy and
+    manage your applications.
 
-    Doc string describing the CLI at a glance.
     """
     log.propagate = silent
 
@@ -80,7 +82,7 @@ def ps(project):
 @pass_project
 def remove(project, uuid):
     """
-    Remove a running service.
+    Remove a running service by uuid.
 
     Example:
 
@@ -101,7 +103,7 @@ def remove(project, uuid):
 @pass_project
 def tag(project, tagged_services):
     """
-    Build and tag a service(s).
+    Build and tag services.
 
     Example:
 
@@ -112,7 +114,7 @@ def tag(project, tagged_services):
     services = project.filter_services(items.keys())
     with cli_exceptions():
         for service in services:
-            tag = items.get(service.name, "latest")
+            tag = items[service.name]
             service.create_tag(tag=tag)
 
 
@@ -121,18 +123,18 @@ def tag(project, tagged_services):
 @pass_project
 def push(project, tagged_services):
     """
-    Push a service's tag to it's registry.
+    Push tagged services to their registries.
 
     Example:
 
-        `skipper push web:v11`
+        `skipper push web:v11 celery:v1`
 
     """
     items = split_tags_and_services(tagged_services)
     services = project.filter_services(items.keys())
     with cli_exceptions():
         for service in services:
-            tag = items.get(service.name, "latest")
+            tag = items[service.name]
             service.push(tag=tag)
 
 
@@ -141,11 +143,11 @@ def push(project, tagged_services):
 @pass_project
 def deploy(project, tagged_services):
     """
-    Deploy a service across the cluster.
+    Deploy services across the cluster.
 
     Example:
 
-        `skipper deploy web:v11`
+        `skipper deploy web:v11 celery:v2`
 
     """
     items = split_tags_and_services(tagged_services)
@@ -158,11 +160,12 @@ def deploy(project, tagged_services):
                 instances = project.host.get_or_create_instances(
                     name=group.name, **group.details())
                 project.host.configure_group(instances, group)
-                tag = items.get(service.name, "latest")
+                tag = items[service.name]
                 project.host.run_service(
                     instances=instances,
                     service=service,
                     tag=tag)
+    click.echo('Deployment was successful')
 
 
 @cli.command()
