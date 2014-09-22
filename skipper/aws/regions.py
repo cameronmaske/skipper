@@ -5,35 +5,35 @@
 REGIONS = {
     'ap-northeast-1': {
         'name': "Asia Pacific (Tokyo) Region",
-        'ami': "ami-1fb9e61e"
+        'ami': "ami-39062938"
     },
     'ap-southeast-1': {
         'name': "Asia Pacific (Singapore) Region",
-        'ami': "ami-d6d88084"
+        'ami': "ami-aee1c5fc"
     },
     'ap-southeast-2': {
         'name': "Asia Pacific (Sydney) Region",
-        'ami': "ami-874620bd"
+        'ami': "ami-0546253f"
     },
     'eu-west-1': {
         'name': "EU (Ireland) Region",
-        'ami': "ami-92ea39e5"
+        'ami': "ami-428d2a35"
     },
     'sa-east-1': {
         'name': "South America (Sao Paulo) Region",
-        'ami': "ami-8f57fe92"
+        'ami': "ami-d96cc6c4"
     },
     'us-east-1': {
         'name': "US East (Northern Virginia) Region",
-        'ami': "ami-7cbc1914"
+        'ami': "ami-1a862f72"
     },
     'us-west-1': {
         'name': "US West (Northern California) Region",
-        'ami': "ami-63eae826"
+        'ami': "ami-01aba244"
     },
     'us-west-2': {
         'name': "US West (Oregon) Region",
-        'ami': "ami-3193e801"
+        'ami': "ami-1189c921"
     },
 }
 

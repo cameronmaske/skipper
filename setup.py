@@ -30,11 +30,16 @@ def find_version():
             return version_match.group(1)
         raise RuntimeError("Unable to find version string.")
 
-with open('requirements.txt') as f:
-    requires = f.read().splitlines()
-    for require in requires:
-        install_requires.append(require)
-
+requires = [
+    'click==2.0',
+    'boto==2.27.0',
+    'Fabric==1.9.0',
+    'docker-py==0.3.2',
+    'Jinja2==2.7.2',
+    'PyYAML==3.10',
+    'requests==2.2.1',
+    'texttable==0.8.1'
+]
 
 setup(
     name='skipper',
@@ -45,7 +50,7 @@ setup(
     url="https://github.com/cameronmaske/skipper",
     py_modules=['skipper'],
     include_package_data=True,
-    install_requires=install_requires,
+    install_requires=requires,
     tests_require=['pytest'],
     license="BSD",
     cmdclass={'test': PyTest},
