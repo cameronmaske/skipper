@@ -2,6 +2,8 @@ from setuptools import setup
 from setuptools.command.test import test as TestCommand
 
 import sys
+import re
+
 
 install_requires = []
 dependency_links = []
@@ -19,6 +21,15 @@ class PyTest(TestCommand):
         sys.exit(errno)
 
 
+def find_version():
+    with open('skipper/__init__.py') as f:
+        version_file = f.read()
+        version_match = re.search(
+            r"^__version__ = ['\"]([^'\"]*)['\"]", version_file, re.M)
+        if version_match:
+            return version_match.group(1)
+        raise RuntimeError("Unable to find version string.")
+
 with open('requirements.txt') as f:
     requires = f.read().splitlines()
     for require in requires:
@@ -27,12 +38,18 @@ with open('requirements.txt') as f:
 
 setup(
     name='skipper',
-    version='0.0.1',
+    author="Cameron Maske",
+    author_email="cameronmaske@gmail.com",
+    version=find_version(),
+    description="Build, deploy and orchestrate your application using Docker.",
+    url="https://github.com/cameronmaske/skipper",
     py_modules=['skipper'],
     include_package_data=True,
     install_requires=install_requires,
     tests_require=['pytest'],
+    license="BSD",
     cmdclass={'test': PyTest},
+    keywords=["docker", "paas", "coreos"],
     entry_points="""
         [console_scripts]
         skipper=skipper.cli:cli

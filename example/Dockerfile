@@ -1,4 +1,4 @@
-FROM orchardup/python:2.7
+FROM python:2.7
 ADD . /code
 WORKDIR /code
 ADD requirements.txt requirements.txt

@@ -65,21 +65,21 @@ class Instance(BaseInstance):
         """
         if self.size != self.boto_instance.instance_type:
             # TOOD: Improve these log messages.
-            log.info("Updating %s (%s -> %s)" % (
+            log.info("Updating [%s] (%s -> %s)." % (
                 self.uuid, self.boto_instance.instance_type, self.size))
 
             self.boto_instance.stop()
-            log.info("Stopping %s" % self.uuid)
+            log.info("Temporarily stopping instance [%s]." % self.uuid)
             while self.boto_instance.state != 'stopped':
                 sleep(1)
                 self.boto_instance.update()
 
-            log.info("Updating %s" % self.uuid)
+            log.info("Updating instance [%s]." % self.uuid)
             self.boto_instance.modify_attribute(
                 'instanceType', self.size
             )
 
-            log.info("Starting %s" % self.uuid)
+            log.info("Restarting instance [%s]." % self.uuid)
             self.boto_instance.start()
 
             while self.boto_instance.state != 'running':

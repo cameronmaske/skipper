@@ -1,5 +1,6 @@
 import logging
 import json
+import sys
 
 console = logging.StreamHandler()
 
@@ -19,12 +20,17 @@ def capture_events(stream):
     A stripped down version of Fig's `stream_output`
     """
     events = []
+    previous = None
     for line in stream:
         try:
             line = json.loads(line)
             if line.get('stream'):
                 log.info(line['stream'].replace('\n', ''))
                 events.append(line['stream'])
+            elif 'progressDetail' in line:
+                if previous != line['status']:
+                    log.info(line['status'])
+                    previous = line['status']
             elif line.get('status'):
                 log.info(line['status'])
             elif line.get('errorDetail'):
