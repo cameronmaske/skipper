@@ -10,11 +10,13 @@ Quick start
 With skipper [installed](#installation), let's deploy a simple web app.
 
 In the app's directory, let's define a `skipper.yml`.
+
 It describers...
-    * `services` - the Docker containers that comprise our app.
-    * `groups` - the instances that comprise our cluster.
-    * `name` - the name of our application
-    * `region` - the region our cluster runs on.
+  - `services` - the Docker containers that comprise our app.
+  - `groups` - the instances that comprise our cluster.
+  - `name` - the name of our application
+  - `region` - the region our cluster runs on.
+
 
 skipper.yml
 ```yml
