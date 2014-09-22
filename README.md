@@ -10,13 +10,15 @@ Quick start
 With skipper [installed](#installation), let's deploy a simple web app.
 
 In the app's directory, let's define a `skipper.yml`.
-It describers...
-    * `services` - the Docker containers that comprise our app.
-    * `groups` - the instances that comprise our cluster.
-    * `name` - the name of our application
-    * `region` - the region our cluster runs on.
 
-skipper.yml
+It describers...
+  - `services` - the Docker containers that comprise our app.
+  - `groups` - the instances that comprise our cluster.
+  - `name` - the name of our application
+  - `region` - the region our cluster runs on.
+
+
+`skipper.yml`
 ```yml
 name: "demo"
 services:
@@ -40,7 +42,7 @@ groups:
 
 Now, let's create web app powered by Flask (A python micro framework) with a Dockerfile that runs it.
 
-app.py
+`app.py`
 ```python
 from flask import Flask
 app = Flask(__name__)
@@ -53,7 +55,7 @@ if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
 ```
 
-Dockerfile
+`Dockerfile`
 ```
 FROM python:2.7
 ADD . /code
@@ -65,9 +67,9 @@ CMD python app.py
 
 Now using skipper, we can deploy our service across the cluster. Deployments using skipper are comprised of three steps...
 
-* `tag` - Build the service Docker image with an assigned tag.
-* `push` - Uploads the tagged image to a Docker image registry.
-* `deploy` - Coordinates with the desired host (currently only [AWS](aws.amazon.com) is supported) to launch or retrieve the required instances, and run the desired services.
+  - `tag` - Build the service Docker image with an assigned tag.
+  - `push` - Uploads the tagged image to a Docker image registry.
+  - `deploy` - Coordinates with the desired host (currently only [AWS](aws.amazon.com) is supported) to launch or retrieve the required instances, and run the desired services.
 
 When using skipper on a new project, you will be prompted for a various credentials required to communicate with the host (such as public/private ssh keys, or access/secret tokens). These are stored in a `.skippercfg` file, which should not be checked in too any source control.
 
