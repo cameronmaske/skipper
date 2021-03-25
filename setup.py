@@ -36,7 +36,7 @@ requires = [
     'Fabric==1.9.0',
     'docker-py==0.3.2',
     'Jinja2==2.7.2',
-    'PyYAML==3.10',
+    'PyYAML==5.4',
     'requests==2.2.1',
     'texttable==0.8.1'
 ]
