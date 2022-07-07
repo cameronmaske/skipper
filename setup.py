@@ -37,7 +37,7 @@ requires = [
     'docker-py==0.3.2',
     'Jinja2==2.7.2',
     'PyYAML==3.10',
-    'requests==2.2.1',
+    'requests==2.20.0',
     'texttable==0.8.1'
 ]
 
